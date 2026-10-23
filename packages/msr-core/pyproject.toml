@@ -1,0 +1,15 @@
+[project]
+name = "msr-core"
+version = "0.1.0"
+description = "MSR core library: co-occurrence model, Markov walk, concepts, and corpus search."
+license = "LicenseRef-PolyForm-Strict-1.0.0"
+authors = [{ name = "Karl Preisner" }]
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "msr"

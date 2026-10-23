@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual envs / uv
+.venv/
+
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local working files (plan, paper transcription, page renders)
+tmp/
+
+# Downloaded data and built model artifacts
+data/
+
+# Secrets / local config
+.env
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
