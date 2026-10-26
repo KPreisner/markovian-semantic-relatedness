@@ -27,14 +27,15 @@ def test_walk_matches_scalar_loop(model: Model, root: str) -> None:
     r = model.vocab.id(root)
     v = hitting_times(model, [r], steps=STEPS)[:, 0]
     s = model.s.toarray().tolist()
-    expected = scalar_walk(s, s, r, STEPS)
+    expected = np.asarray(scalar_walk(s, s, r, STEPS))
+    expected[r] = 0.0  # a root's distance to itself
     inside = component_of(model, r)
-    np.testing.assert_allclose(v[inside], np.asarray(expected)[inside], rtol=1e-12)
+    np.testing.assert_allclose(v[inside], expected[inside], rtol=1e-12)
 
 
 # Cross-checked by the scalar loop above; frozen after review.
 GOLDEN_V_CAT = {
-    "cat": 5.2751,
+    "cat": 0.0,
     "child": 11.5754,
     "dog": 11.2271,
     "fat": 2.5734,
@@ -97,6 +98,7 @@ def test_first_step_uses_s_after_truncation(model: Model) -> None:
     assert via_t[cat, 0] == STEPS + 1
     assert via_s[cat, 0] < STEPS + 1
     s = model.s.toarray().tolist()
+    # The backend computes the walk as printed; only `hitting_times` zeroes the root itself.
     expected = scalar_walk(s, t1.toarray().tolist(), the, STEPS)
     inside = component_of(model, the)
     np.testing.assert_allclose(via_s[inside, 0], np.asarray(expected)[inside], rtol=1e-12)

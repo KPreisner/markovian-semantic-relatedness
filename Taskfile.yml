@@ -1,5 +1,8 @@
 version: "3"
 
+includes:
+  build: taskfiles/build.yml
+
 tasks:
   default:
     cmds:
@@ -28,3 +31,8 @@ tasks:
     desc: Run unit tests
     cmds:
       - uv run pytest {{.CLI_ARGS}}
+
+  msr:
+    desc: "Run the msr CLI natively (e.g. -- concept trumpet --model <id>)"
+    cmds:
+      - uv run msr {{.CLI_ARGS}}

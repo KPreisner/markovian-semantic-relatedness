@@ -9,7 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from msr.concept.ranking import rank_terms, scale
 from msr.concept.zscore import negated_z, trim_count, trimmed_stats
 from msr.model.build import Model
-from msr.model.references import References, component_nodes, select_references
+from msr.model.references import (
+    DegreeMean,
+    References,
+    StrategySpec,
+    component_nodes,
+    select_references,
+)
 from msr.walk.backend import Progress, WalkBackend
 from msr.walk.hitting import hitting_times
 
@@ -20,6 +26,7 @@ class ConceptParams(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True, allow_inf_nan=False)
 
+    refs: StrategySpec = Field(DegreeMean(), description="Reference strategy, e.g. degree-mean")
     steps: int = Field(1000, ge=1, description="λ: walk steps, no early stop")
     q: int = Field(50, ge=1, description="Reference columns used per concept")
     trim_ratio: float = Field(0.2, ge=0, lt=1, description="R: p = ⌈R·Q⌉ entries trimmed per row")
@@ -83,6 +90,8 @@ def build_concept(
     progress: Progress | None = None,
 ) -> Concept:
     params = params or ConceptParams()
+    if params.refs != references.strategy:
+        raise ValueError(f"references use {references.strategy}, not {params.refs}")
     if params.steps != references.steps:
         raise ValueError(f"X′ was walked with λ = {references.steps}, not {params.steps}")
     refs, xprime, dropped = reference_columns(model, root, references, params.q, backend=backend)

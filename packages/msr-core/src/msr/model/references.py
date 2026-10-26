@@ -7,9 +7,11 @@ a fixed seed.
 """
 
 from dataclasses import dataclass
+from typing import Annotated
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import BeforeValidator, PlainSerializer
 
 from msr.model.build import Model
 from msr.model.components import largest_component
@@ -98,6 +100,16 @@ def parse_strategy(spec: str) -> Strategy:
         f"unknown reference strategy {spec!r}; expected degree-mean, df-mean, exact, "
         "random:<seed>, stratified-logdf:<seed>, or gauss-logdf:<seed>"
     )
+
+
+def _parse_if_spec(value: object) -> object:
+    return parse_strategy(value) if isinstance(value, str) else value
+
+
+type StrategySpec = Annotated[
+    Strategy, BeforeValidator(_parse_if_spec), PlainSerializer(str, return_type=str)
+]
+"""A strategy in a pydantic model: accepts a strategy or its spec string, serializes as the spec."""
 
 
 def _closest(values: NDArray[np.float64], component: Nodes) -> Nodes:

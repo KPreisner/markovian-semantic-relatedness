@@ -44,10 +44,109 @@ Tests live in `tests/<import name>/`.
 Requires [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.dev).
 
 ```bash
-task uv-sync    # create .venv from uv.lock
-task py-lint    # ruff check, ruff format --check, mypy (same as CI)
-task py-test    # pytest
-task            # list all tasks
+task uv-sync              # create .venv from uv.lock
+task py-lint              # ruff check, ruff format --check, mypy (same as CI)
+task py-format            # auto-format and apply safe lint fixes
+task py-test              # pytest; extra args after --, e.g. task py-test -- -k walk
+task msr -- <args>        # run the msr CLI, e.g. task msr -- concept trumpet --model <id>
+task build:parse-native   # msr parse: raw text → term sets (see Building the Simple English model)
+task build:model-native   # msr model: term sets → model artifacts and X′
+task build:corpus-native  # msr corpus: raw data → a search corpus
+task                      # list all tasks
+```
+
+## Building the Simple English model
+
+Everything large lives under `data/` (gitignored; set `MSR_DATA_DIR` to put it elsewhere). The
+commands below run from the repository root, and each block can be pasted into a shell as is.
+
+### 1. Download the raw data
+
+The spaCy English pipeline (about 400 MB), loaded by path rather than installed:
+
+```bash
+mkdir -p data/raw/nlp data/nlp
+curl -L -o data/raw/nlp/en_core_web_lg-3.8.0-py3-none-any.whl \
+  https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+unzip -q data/raw/nlp/en_core_web_lg-3.8.0-py3-none-any.whl -d data/nlp/en_core_web_lg
+```
+
+Simple English Wikipedia, Hugging Face snapshot `20231101` (157 MB of clean text):
+
+```bash
+mkdir -p data/raw/hf_wiki/20231101.simple
+curl -L -o data/raw/hf_wiki/20231101.simple/train-00000-of-00001.parquet \
+  https://huggingface.co/datasets/wikimedia/wikipedia/resolve/main/20231101.simple/train-00000-of-00001.parquet
+```
+
+One or two CC-NEWS WARCs (about 1 GB each) as a search corpus. List a month's files:
+
+```bash
+mkdir -p data/raw/ccnews
+curl -s https://data.commoncrawl.org/crawl-data/CC-NEWS/2026/09/warc.paths.gz | gunzip | head
+```
+
+Then download one, replacing `<path>` with a line from that list:
+
+```bash
+curl -L -O --output-dir data/raw/ccnews https://data.commoncrawl.org/<path>
+```
+
+### 2. Parse Wikipedia into term sets
+
+spaCy tokenizes every paragraph and runs NER. With 8 workers, the 3.5 million paragraphs take
+roughly an hour. The output goes to `data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0/`
+in parts, so an interrupted run resumes where it stopped.
+
+```bash
+task build:parse-native -- wiki data/raw/hf_wiki/20231101.simple \
+  --pipeline data/nlp/en_core_web_lg --workers 8
+```
+
+### 3. Prepare the CC-NEWS search corpus
+
+Extracts article text from every WARC in `data/raw/ccnews/` and keeps the English articles, in
+`data/corpora/ccnews-en/`. One WARC takes about 8 minutes and yields a few thousand articles. This
+can run at the same time as the parse.
+
+```bash
+task build:corpus-native -- ccnews --lang en
+```
+
+### 4. Build the model
+
+Drops the 100 most frequent terms as stop words, builds C, M, S, and T, and walks the 51 reference
+nodes for X′, into `data/models/<id>/` (its `df_report.json` shows where other stop-word rules
+would cut). Rerunning the same command with the same `--id` resumes at the first unfinished stage.
+
+For local development, a small, fast model is enough. `--parts 10` uses the first 10 parsed parts
+(about 20,000 articles) and `--steps 100` walks 100 steps instead of 1,000; it builds in about 4
+minutes. Concepts use the same step count automatically.
+
+```bash
+task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
+  --name simplewiki-small --id simplewiki-small --parts 10 --steps 100
+```
+
+All of Simple English with the paper's 1,000 steps (X′ takes hours on CPU):
+
+```bash
+task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
+  --name simplewiki --id simplewiki-1
+```
+
+### 5. Concepts and search
+
+A new concept is one walk over the model: seconds for the small model, minutes for the full one.
+Concepts are cached under `data/concepts/`, so a repeat is instant. Each concept's
+directory has a `concept.tsv` with all of its ranked terms (rank, weight, co-occur, count, term),
+for reading in a spreadsheet or with `less`. Several roots in one search are
+combined with a geometric mean, so a paragraph must match all of them.
+
+```bash
+task msr -- concept trumpet --model simplewiki-small
+task msr -- search trumpet --corpus ccnews-en --model simplewiki-small --workers 8
+task msr -- search music festival --corpus ccnews-en --model simplewiki-small
 ```
 
 ## License

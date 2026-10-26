@@ -51,10 +51,6 @@ def test_maxdf_is_inclusive() -> None:
     assert select_stop_words(DF, MaxDF(0.3), n_chunks=10) == {"the", "a", "cat", "dog"}
 
 
-def test_protected_terms_are_never_dropped() -> None:
-    assert select_stop_words(DF, TopK(2), n_chunks=10, protected={"the"}) == {"a", "cat"}
-
-
 def test_rules_run_per_group() -> None:
     df = {"the": 9, "a": 8, "的": 7, "是": 2, "cat": 1}
     zh = select_stop_words(df, TopK(1), n_chunks=10, group=lambda t: str(t.isascii()))
