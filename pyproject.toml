@@ -41,6 +41,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 python_version = "3.14"
 strict = true
 files = ["packages/*/src", "tests"]
+mypy_path = "stubs"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
