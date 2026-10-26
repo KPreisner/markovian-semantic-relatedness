@@ -1,0 +1,75 @@
+name: msr
+
+# Every service loads both env files (see .env.static). Run through `task`, which runs
+# `task validate` first and creates an empty .env if there is none.
+x-env-files: &env-files
+  env_file: [.env.static, .env]
+
+services:
+  postgres:
+    image: postgres:18.6-trixie
+    <<: *env-files
+    volumes:
+      # Postgres 18 images keep PGDATA in a version subdirectory of /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4.4.0-management
+    <<: *env-files
+    hostname: rabbitmq
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/20-msr.conf:/etc/rabbitmq/conf.d/20-msr.conf:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  redis:
+    image: redis:8.8.4-alpine
+    <<: *env-files
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Run-and-exit: `task build:<stage> -- …` runs `docker compose run --rm builder msr …`.
+  builder:
+    image: msr-builder:latest
+    build:
+      context: .
+      dockerfile: docker/builder.Dockerfile
+      target: final
+    profiles: [build]
+    <<: *env-files
+    environment:
+      MSR_DATA_DIR: /data
+    volumes:
+      - ${MSR_DATA_DIR:-./data}:/data
+    networks: [backend, egress]
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  redis-data:
+
+networks:
+  # Nothing on this network reaches the internet or is published to the host.
+  backend:
+    internal: true
+  # Outbound access, for the builder's downloads only.
+  egress:

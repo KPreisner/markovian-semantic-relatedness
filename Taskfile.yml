@@ -1,7 +1,20 @@
 version: "3"
 
+# Top-level tasks only; the modules live in taskfiles/. The stack module is flattened, so its
+# tasks (validate, up, down, …) have no prefix. `task` with no arguments lists everything.
+
 includes:
+  py: taskfiles/py.yml
+  stack:
+    taskfile: taskfiles/stack.yml
+    flatten: true
+  dev: taskfiles/dev.yml
+  db: taskfiles/db.yml
   build: taskfiles/build.yml
+  # Your own tasks, gitignored: copy taskfiles/udt.sample.yml to taskfiles/udt.yml.
+  udt:
+    taskfile: taskfiles/udt.yml
+    optional: true
 
 tasks:
   default:
@@ -9,30 +22,34 @@ tasks:
       - task --list
     silent: true
 
-  uv-sync:
-    desc: Install/update the virtual environment from uv.lock
+  check:
+    desc: Lint, type check, and test (alias of py:check)
     cmds:
-      - uv sync
-
-  py-lint:
-    desc: Lint, check formatting, and type check (same as CI)
-    cmds:
-      - uv run ruff check
-      - uv run ruff format --check
-      - uv run mypy
-
-  py-format:
-    desc: Auto-format and apply safe lint fixes (incl. import sorting)
-    cmds:
-      - uv run ruff check --fix
-      - uv run ruff format
-
-  py-test:
-    desc: Run unit tests
-    cmds:
-      - uv run pytest {{.CLI_ARGS}}
+      - task: py:check
 
   msr:
     desc: "Run the msr CLI natively (e.g. -- concept trumpet --model <id>)"
     cmds:
       - uv run msr {{.CLI_ARGS}}
+
+  # The pre-split names, kept so muscle memory and docs keep working.
+  uv-sync:
+    desc: Alias of py:sync
+    cmds:
+      - task: py:sync
+
+  py-lint:
+    desc: Alias of py:lint + py:typecheck (same as CI)
+    cmds:
+      - task: py:lint
+      - task: py:typecheck
+
+  py-format:
+    desc: Alias of py:format
+    cmds:
+      - task: py:format
+
+  py-test:
+    desc: Alias of py:test
+    cmds:
+      - task: py:test

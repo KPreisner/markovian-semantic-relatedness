@@ -1,0 +1,21 @@
+version: "3"
+
+# Postgres. Service roles and the migration runner (db:migrate) arrive with the migrations; until
+# then psql connects as the superuser.
+
+tasks:
+  psql:
+    desc: "Open psql in the postgres container (extra psql args after --)"
+    dir: "{{.ROOT_DIR}}"
+    interactive: true
+    cmds:
+      - docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' psql {{.CLI_ARGS}}
+
+  reset:
+    desc: Delete the Postgres volume and start a fresh, empty database
+    dir: "{{.ROOT_DIR}}"
+    prompt: This deletes every table and row in the local Postgres. Continue?
+    cmds:
+      - docker compose rm --stop --force postgres
+      - docker volume rm -f msr_postgres-data
+      - task: :up

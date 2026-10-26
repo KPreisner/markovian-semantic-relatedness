@@ -1,0 +1,11 @@
+version: "3"
+
+# User-defined tasks. Copy this file to taskfiles/udt.yml (gitignored) and add your own; they show
+# up as udt:<name>.
+
+tasks:
+  hello:
+    desc: An example user-defined task
+    cmds:
+      - echo "Hello from udt.yml"
+    silent: true

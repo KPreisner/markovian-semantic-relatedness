@@ -1,20 +1,42 @@
 version: "3"
 
-# Builder commands run natively with uv. The Docker variants (`docker compose run --rm builder
-# msr …`) arrive with the builder container in Phase 5. Arguments after `--` go to `msr`.
+# Builder commands. Each runs `msr` in the builder container (`docker compose run --rm builder`,
+# rebuilding the image if the source changed), and its -native twin runs it with uv. Arguments
+# after `--` go to `msr`; `data/...` paths mean the same thing in both.
 
 tasks:
+  parse:
+    desc: "NLP-parse a source into term sets in the builder (e.g. -- wiki data/raw/hf_wiki/20231101.simple --pipeline data/nlp/en_core_web_lg)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose run --rm --build builder msr parse {{.CLI_ARGS}}
+
   parse-native:
-    desc: "NLP-parse a source into term sets (e.g. -- wiki data/raw/hf_wiki/20231101.simple --pipeline data/nlp/en_core_web_lg)"
+    desc: "NLP-parse a source into term sets with uv"
     cmds:
       - uv run msr parse {{.CLI_ARGS}}
 
+  model:
+    desc: "Build or resume a model in the builder (e.g. -- data/parsed/<source>/<pipeline> --name simplewiki)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose run --rm --build builder msr model {{.CLI_ARGS}}
+
   model-native:
-    desc: "Build or resume a model from parsed term sets (e.g. -- data/parsed/<source>/<pipeline> --name simplewiki)"
+    desc: "Build or resume a model with uv"
     cmds:
       - uv run msr model {{.CLI_ARGS}}
 
+  corpus:
+    desc: "Prepare a search corpus in the builder (e.g. -- ccnews --lang en)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose run --rm --build builder msr corpus {{.CLI_ARGS}}
+
   corpus-native:
-    desc: "Prepare a search corpus (e.g. -- ccnews --lang en)"
+    desc: "Prepare a search corpus with uv"
     cmds:
       - uv run msr corpus {{.CLI_ARGS}}
