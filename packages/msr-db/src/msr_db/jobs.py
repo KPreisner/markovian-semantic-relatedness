@@ -4,12 +4,15 @@ The API creates jobs and touches only their status fields; the worker owns their
 (Worker reliability in the plan). A concept job carries its cache key, and the partial unique
 index `uq_jobs_active_concept` allows one queued or running job per key, so concurrent identical
 requests share one job.
+
+Every transition out of an active status is guarded by `status IN ('queued', 'running')`, so a
+job that some other actor already finished is never overwritten.
 """
 
 from typing import Any
 from uuid import UUID
 
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, Connection
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
@@ -49,6 +52,23 @@ JOB_SET_TASK = "UPDATE msr.jobs SET task_id = %s WHERE job_id = %s"
 JOB_FAIL = """
     UPDATE msr.jobs
     SET status = 'failed', error_code = %s, error_message = %s, finished_at = now()
+    WHERE job_id = %s AND status IN ('queued', 'running')
+"""
+JOB_START = """
+    UPDATE msr.jobs
+    SET status = 'running', attempts = attempts + 1, worker_id = %s, task_id = %s,
+        started_at = now()
+    WHERE job_id = %s AND status IN ('queued', 'running')
+    RETURNING *
+"""
+JOB_WARN = "UPDATE msr.jobs SET warnings = array_append(warnings, %s) WHERE job_id = %s"
+JOB_PROGRESS = """
+    UPDATE msr.jobs SET progress = %s
+    WHERE job_id = %s AND status = 'running'
+"""
+JOB_SUCCEED = """
+    UPDATE msr.jobs
+    SET status = 'succeeded', result_id = %s, finished_at = now()
     WHERE job_id = %s AND status IN ('queued', 'running')
 """
 
@@ -106,3 +126,36 @@ class AsyncJobRepository:
         """Mark an active job failed. Returns whether it was still active."""
         cur = await self.conn.execute(JOB_FAIL, (code, message, job_id))
         return cur.rowcount > 0
+
+
+class JobRepository:
+    """The worker's side: load a job and move it through its lifecycle."""
+
+    def __init__(self, conn: Connection[Any]) -> None:
+        self.conn = conn
+
+    def get(self, job_id: UUID) -> JobRow | None:
+        with self.conn.cursor(row_factory=class_row(JobRow)) as cur:
+            cur.execute(JOB_GET, (job_id,))
+            return cur.fetchone()
+
+    def start(self, job_id: UUID, *, worker_id: str, task_id: str | None) -> JobRow | None:
+        """Count an attempt and mark the job running. None if it's no longer active."""
+        with self.conn.cursor(row_factory=class_row(JobRow)) as cur:
+            cur.execute(JOB_START, (worker_id, task_id, job_id))
+            return cur.fetchone()
+
+    def warn(self, job_id: UUID, warning: str) -> None:
+        self.conn.execute(JOB_WARN, (warning, job_id))
+
+    def progress(self, job_id: UUID, snapshot: dict[str, Any]) -> None:
+        """The last progress event, for clients that poll and for SSE without a stream."""
+        self.conn.execute(JOB_PROGRESS, (Jsonb(snapshot), job_id))
+
+    def succeed(self, job_id: UUID, result_id: UUID) -> bool:
+        """Mark an active job succeeded. Returns whether it was still active."""
+        return self.conn.execute(JOB_SUCCEED, (result_id, job_id)).rowcount > 0
+
+    def fail(self, job_id: UUID, code: str, message: str) -> bool:
+        """Mark an active job failed. Returns whether it was still active."""
+        return self.conn.execute(JOB_FAIL, (code, message, job_id)).rowcount > 0

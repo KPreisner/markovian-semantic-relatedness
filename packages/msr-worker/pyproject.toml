@@ -5,7 +5,13 @@ description = "MSR Celery worker: concept and search jobs."
 license = "LicenseRef-PolyForm-Strict-1.0.0"
 authors = [{ name = "Karl Preisner" }]
 requires-python = ">=3.14"
-dependencies = ["msr-core", "msr-db"]
+dependencies = [
+    "celery>=5.6.3",
+    "msr-core",
+    "msr-db",
+    "redis>=8.1.0",
+    "structlog>=26.1.0",
+]
 
 [tool.uv.sources]
 msr-core = { workspace = true }

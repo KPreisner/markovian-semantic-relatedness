@@ -59,8 +59,14 @@ def resolve_params(model: ModelRow, request: ConceptRequest) -> ConceptParams:
             code="refs_not_built",
             details={"built": sorted(built)},
         )
-    if "steps" in overrides:
-        return provisional
+    # A concept's walk must match its X′'s λ, and each strategy's X′ is walked once.
+    if "steps" in overrides and provisional.steps != built[refs]:
+        raise UnprocessableError(
+            f"model {model.model_id!r} has X′ for {refs!r} at λ = {built[refs]}, not "
+            f"{provisional.steps}",
+            code="steps_not_built",
+            details={"steps": built[refs]},
+        )
     return ConceptParams.model_validate({**overrides, "steps": built[refs]})
 
 

@@ -99,6 +99,52 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  # Celery worker for concept and search jobs on the `cpu` queue. Models and corpora are mounted
+  # read-only; it writes concepts/ and searches/. One task at a time per container (scale with
+  # more containers); a stop lets the running job finish first (warm shutdown).
+  worker:
+    image: msr-worker:latest
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+      target: final
+      args: {MEMBER: msr-worker}
+    <<: *env-files
+    command:
+      - celery
+      - --app=msr_worker.app:celery_app
+      - worker
+      - --queues=cpu
+      - --concurrency=1
+      - --prefetch-multiplier=1
+      - --max-tasks-per-child=50
+      - --without-gossip
+      - --without-heartbeat
+      - --without-mingle
+      - --loglevel=INFO
+    environment:
+      MSR_DATA_DIR: /data
+    volumes:
+      - ${MSR_DATA_DIR:-./data}/models:/data/models:ro
+      - ${MSR_DATA_DIR:-./data}/corpora:/data/corpora:ro
+      - ${MSR_DATA_DIR:-./data}/concepts:/data/concepts
+      - ${MSR_DATA_DIR:-./data}/searches:/data/searches
+    networks: [backend]
+    stop_grace_period: 30m
+    healthcheck:
+      test: ["CMD", "python", "-m", "msr_worker.healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   # Run-and-exit: `task build:<stage> -- …` runs `docker compose run --rm builder msr …`.
   builder:
     image: msr-builder:latest

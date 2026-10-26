@@ -3,6 +3,8 @@
 import numpy as np
 from numpy.typing import NDArray
 
+from msr.concept.errors import NoConceptError
+
 
 def rank_terms(
     z: NDArray[np.float64],
@@ -31,5 +33,5 @@ def scale(weights: NDArray[np.float64], root_weight: float, target: float) -> ND
     The paper prints y / (w_r·a), which maps the root to 1/a; every table has the root at a.
     """
     if not root_weight > 0:
-        raise ValueError(f"the root's z must be positive to scale by it, got {root_weight}")
+        raise NoConceptError(f"the root's z must be positive to scale by it, got {root_weight}")
     return target * weights / root_weight

@@ -8,8 +8,9 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, Connection
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from msr_db.rows import ConceptRow, ConceptSummaryRow, ConceptTermRow
 
@@ -25,6 +26,15 @@ CONCEPT_FOR_ROOT = """
 """
 CONCEPT_MODELS = """
     SELECT concept_id, model_id FROM msr.concepts WHERE concept_id = ANY(%s)
+"""
+# The worker's write. A concept that another job already stored wins: the insert does nothing and
+# the caller reads that row's id with CONCEPT_FIND.
+CONCEPT_INSERT = """
+    INSERT INTO msr.concepts
+        (model_id, root_idx, params, params_hash, term_idx, weight, cooccur)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (model_id, root_idx, params_hash) DO NOTHING
+    RETURNING concept_id
 """
 CONCEPT_TERMS = """
     SELECT t.rank::integer AS rank, t.term_idx, v.term, v.term_count, t.weight, t.cooccur
@@ -69,3 +79,57 @@ class AsyncConceptRepository:
         async with self.conn.cursor(row_factory=class_row(ConceptTermRow)) as cur:
             await cur.execute(CONCEPT_TERMS, (concept_id, limit))
             return await cur.fetchall()
+
+
+class ConceptRepository:
+    """The worker's side: the cache check, the write, and the ranked terms a search uses."""
+
+    def __init__(self, conn: Connection[Any]) -> None:
+        self.conn = conn
+
+    def get(self, concept_id: UUID) -> ConceptRow | None:
+        with self.conn.cursor(row_factory=class_row(ConceptRow)) as cur:
+            cur.execute(CONCEPT_GET, (concept_id,))
+            return cur.fetchone()
+
+    def find(self, model_id: str, root_idx: int, params_hash: str) -> ConceptRow | None:
+        with self.conn.cursor(row_factory=class_row(ConceptRow)) as cur:
+            cur.execute(CONCEPT_FIND, (model_id, root_idx, params_hash))
+            return cur.fetchone()
+
+    def insert(
+        self,
+        model_id: str,
+        root_idx: int,
+        params: dict[str, Any],
+        params_hash: str,
+        *,
+        term_idx: Sequence[int],
+        weight: Sequence[float],
+        cooccur: Sequence[int],
+    ) -> UUID:
+        """Store a concept and return its id, or the id of the one already stored with this
+        key."""
+        row = self.conn.execute(
+            CONCEPT_INSERT,
+            (
+                model_id,
+                root_idx,
+                Jsonb(params),
+                params_hash,
+                list(term_idx),
+                list(weight),
+                list(cooccur),
+            ),
+        ).fetchone()
+        if row is not None:
+            concept_id: UUID = row[0]
+            return concept_id
+        existing = self.find(model_id, root_idx, params_hash)
+        assert existing is not None  # the conflicting row; concepts are never deleted alone
+        return existing.concept_id
+
+    def terms(self, concept_id: UUID, *, limit: int) -> list[ConceptTermRow]:
+        with self.conn.cursor(row_factory=class_row(ConceptTermRow)) as cur:
+            cur.execute(CONCEPT_TERMS, (concept_id, limit))
+            return cur.fetchall()

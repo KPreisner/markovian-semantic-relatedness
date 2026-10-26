@@ -19,6 +19,7 @@ dev = [
     "pyarrow-stubs>=20.0",
     "httpx>=0.28.1",
     "celery-types>=0.26.0",
+    "watchdog>=6.0.0",
 ]
 
 [tool.uv]

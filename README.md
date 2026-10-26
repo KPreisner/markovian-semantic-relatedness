@@ -56,8 +56,8 @@ task check                # lint, typecheck, and test (py:check); task py-lint i
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
 
-The stack (the API, Postgres, RabbitMQ, and Redis so far) runs in Docker Compose. Nothing is
-published to the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
+The stack (the API, the worker, Postgres, RabbitMQ, and Redis so far) runs in Docker Compose.
+Nothing is published to the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
 secrets and local overrides).
 
 ```bash
@@ -95,6 +95,13 @@ with hot reload and publishes it on `127.0.0.1:8000` only, with Swagger UI at
 | `POST /searches`, `GET /searches/{id}` | search with concepts; its job and ranked hits |
 | `GET /jobs/{id}`, `GET /jobs/{id}/events` | a job's status, and its progress as Server-Sent Events |
 
+The worker (Celery) runs those jobs from the `cpu` queue: it builds concepts with the models under
+`data/models/` and scans the corpora under `data/corpora/`, both mounted read-only, and writes
+`data/concepts/` and `data/searches/`. A concept the `msr concept` CLI already built (same model,
+root, and parameters) is reused from its files. A job's attempts are counted in Postgres: a killed
+worker's job is redelivered and runs again, and a job fails for good after three attempts.
+`task dev:up:worker` runs the worker from source and restarts it when a `.py` file changes.
+
 Builder commands (see Building the Simple English model). Each runs `msr` in the builder
 container, and its `-native` twin runs the same command with uv; the arguments are the same.
 
@@ -106,6 +113,7 @@ task build:register -- model <id>   # register a built model (or: -- corpus <nam
 task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
 task dev:up               # start the stack with every compose-overrides/ dev override applied
 task dev:up:api           # just the API from source, hot reload, on 127.0.0.1:8000
+task dev:up:worker        # just the worker from source, restarted on code changes
 ```
 
 Personal tasks go in `taskfiles/udt.yml` (gitignored; start from `taskfiles/udt.sample.yml`) and

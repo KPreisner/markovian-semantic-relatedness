@@ -15,9 +15,9 @@ from psycopg_pool import AsyncConnectionPool
 from redis.asyncio import Redis
 
 import msr
+from msr.service.logging import configure_logging
 from msr_api.core import errors
 from msr_api.core.config import ApiSettings
-from msr_api.core.logging import configure_logging
 from msr_api.middleware.correlation_id import CorrelationIdMiddleware
 from msr_api.middleware.response_logging import ResponseLoggingMiddleware
 from msr_api.routers import concepts, corpora, health, jobs, models, searches

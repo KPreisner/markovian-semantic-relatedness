@@ -4,13 +4,7 @@ import httpx
 import pytest
 
 from msr_db.settings import DatabaseSettings
-from tests.fixtures.api import RunningApi, clear_jobs, running_api, seed
-
-
-@pytest.fixture(scope="session")
-def seeded(database: DatabaseSettings) -> DatabaseSettings:
-    seed(database)
-    return database
+from tests.fixtures.api import RunningApi, clear_jobs, running_api
 
 
 @pytest.fixture(scope="session")

@@ -1,11 +1,9 @@
 """`GET /jobs/{id}` and `GET /jobs/{id}/events`: SSE over the job's Redis Stream."""
 
-import json
 import os
 import threading
 import time
 from collections.abc import Iterator
-from typing import Any
 from uuid import UUID, uuid7
 
 import httpx
@@ -16,11 +14,9 @@ from psycopg.types.json import Jsonb
 
 from msr.jobs.events import STREAM_FIELD, ErrorEvent, JobEvent, ProgressEvent, ResultEvent
 from msr.jobs.events import stream_key as key_of
-from tests.fixtures.api import MODEL_ID, RunningApi, running_api
+from tests.fixtures.api import MODEL_ID, Event, RunningApi, read_events, running_api
 
 pytestmark = pytest.mark.integration
-
-type Event = tuple[str | None, dict[str, Any]]
 
 
 @pytest.fixture
@@ -47,39 +43,6 @@ def emit(streams: redis.Redis, job_id: str, event: JobEvent) -> str:
 def update_job(api: RunningApi, job_id: str, sql: str, *params: object) -> None:
     with psycopg.connect(api.database.conninfo("owner")) as conn:
         conn.execute(f"UPDATE msr.jobs SET {sql} WHERE job_id = %s", (*params, job_id))
-
-
-def read_events(
-    url: str, job_id: str, *, last_event_id: str | None = None, limit: int | None = None
-) -> list[Event]:
-    """Parse the SSE stream until the server closes it (or `limit` events arrive)."""
-    headers = {"Last-Event-ID": last_event_id} if last_event_id else {}
-    events: list[Event] = []
-    with (
-        httpx.Client(base_url=url, timeout=10) as client,
-        client.stream("GET", f"/jobs/{job_id}/events", headers=headers) as response,
-    ):
-        assert response.status_code == 200
-        assert response.headers["content-type"].startswith("text/event-stream")
-        entry_id: str | None = None
-        data: list[str] = []
-        for line in response.iter_lines():
-            if line.startswith(":"):
-                continue  # a ping comment
-            if line == "":
-                if data:
-                    events.append((entry_id, json.loads("\n".join(data))))
-                    if limit is not None and len(events) >= limit:
-                        break
-                entry_id, data = None, []
-                continue
-            name, _, value = line.partition(":")
-            value = value.removeprefix(" ")
-            if name == "id":
-                entry_id = value or None
-            elif name == "data":
-                data.append(value)
-    return events
 
 
 def test_events_arrive_in_order_with_their_stream_ids(

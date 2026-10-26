@@ -11,5 +11,7 @@ QUEUES = (CPU_QUEUE, GPU_QUEUE)
 same name, with the queue name as its routing key. A mismatch makes RabbitMQ refuse the
 declaration (PRECONDITION_FAILED)."""
 
-CORRELATION_HEADER = "correlation_id"
-"""The Celery message header carrying the request's correlation id."""
+CORRELATION_HEADER = "msr_correlation_id"
+"""The Celery message header carrying the request's correlation id. Not `correlation_id`: Celery
+already uses that name for the AMQP property holding the task id, and on the worker the property
+wins."""
