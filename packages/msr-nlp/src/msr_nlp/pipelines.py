@@ -14,6 +14,8 @@ class PipelineInfo:
     """e.g. `en_core_web_lg`."""
     version: str
     lang: str
+    components: tuple[str, ...] = ()
+    """The components that run (disabled ones excluded), e.g. `("ner",)`."""
 
     @property
     def slug(self) -> str:
@@ -56,5 +58,8 @@ def load_pipeline(path: Path) -> Language:
 def pipeline_info(nlp: Language) -> PipelineInfo:
     meta = nlp.meta
     return PipelineInfo(
-        name=f"{meta['lang']}_{meta['name']}", version=str(meta["version"]), lang=meta["lang"]
+        name=f"{meta['lang']}_{meta['name']}",
+        version=str(meta["version"]),
+        lang=meta["lang"],
+        components=tuple(nlp.pipe_names),
     )

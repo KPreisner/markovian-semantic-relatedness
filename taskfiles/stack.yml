@@ -24,11 +24,25 @@ tasks:
     silent: true
 
   up:
-    desc: Start the stack in the background and wait until it is healthy
+    desc: Start the stack in the background, migrate, and wait until it is healthy
     dir: "{{.ROOT_DIR}}"
     deps: [validate]
     cmds:
-      - docker compose up -d --wait {{.CLI_ARGS}}
+      - task: start
+
+  # Shared by `up` and `dev:up*` (FILES: extra `-f` options). Images are built in their own step:
+  # Compose 2.17's `run --build` / `up --build` recreate dependencies' containers even when
+  # nothing changed. And `up --wait` fails when a one-shot service exits, even with 0, so migrate
+  # runs first on its own and the long-running services then start without it.
+  start:
+    internal: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose {{.FILES}} build
+      - docker compose {{.FILES}} run --rm migrate
+      - >-
+        docker compose {{.FILES}} up -d --wait --no-deps
+        $(docker compose {{.FILES}} config --services | grep -vx migrate)
 
   down:
     desc: Stop the stack (volumes are kept)

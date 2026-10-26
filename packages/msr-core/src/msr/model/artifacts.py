@@ -32,6 +32,8 @@ class ModelManifest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     model_id: str
+    description: str = ""
+    """Free text from whoever built the model: what it's made from and why."""
     params: ModelParams
     stop_words: list[str]
     dictionary_pairs: int
@@ -40,14 +42,26 @@ class ModelManifest(BaseModel):
     nnz_t: int
     components: int
     largest_component_size: int
+    reference_steps: dict[str, int] = Field(default_factory=dict)
+    """Each built reference strategy → the λ its X′ was walked with: a concept's default `steps`,
+    known from the manifest alone (the API never reads `refs/`)."""
     build: dict[str, Any] = Field(default_factory=dict)
     """Builder-owned provenance: sources, pipeline, stage checksums."""
 
     @classmethod
-    def describe(cls, model: Model, model_id: str, build: dict[str, Any]) -> ModelManifest:
+    def describe(
+        cls,
+        model: Model,
+        model_id: str,
+        build: dict[str, Any],
+        *,
+        description: str = "",
+        reference_steps: dict[str, int] | None = None,
+    ) -> ModelManifest:
         sizes = np.bincount(model.labels)
         return cls(
             model_id=model_id,
+            description=description,
             params=model.params,
             stop_words=sorted(model.stop_words),
             dictionary_pairs=model.dictionary_pairs,
@@ -56,6 +70,7 @@ class ModelManifest(BaseModel):
             nnz_t=model.t.nnz,
             components=len(sizes),
             largest_component_size=int(sizes[largest_component(model.labels)]),
+            reference_steps=reference_steps or {},
             build=build,
         )
 
@@ -147,6 +162,15 @@ def reference_steps(model_dir: Path, strategy: object) -> int:
     """The λ a strategy's X′ was walked with, without loading X′."""
     path = references_dir(model_dir, strategy) / "refs.json"
     return _RefsFile.model_validate_json(path.read_bytes()).steps
+
+
+def built_reference_steps(model_dir: Path) -> dict[str, int]:
+    """Every strategy under `refs/` → the λ its X′ was walked with, read from its `refs.json`."""
+    steps = {}
+    for path in sorted((model_dir / "refs").glob("*/refs.json")):
+        meta = _RefsFile.model_validate_json(path.read_bytes())
+        steps[str(meta.strategy)] = meta.steps
+    return steps
 
 
 def load_references(model_dir: Path, strategy: object) -> References:

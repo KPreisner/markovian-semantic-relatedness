@@ -1,11 +1,14 @@
 [project]
 name = "msr-db"
 version = "0.1.0"
-description = "MSR database: SQLAlchemy models, Alembic migrations, and repositories."
+description = "MSR database: connection settings and raw-SQL repositories (psycopg 3)."
 license = "LicenseRef-PolyForm-Strict-1.0.0"
 authors = [{ name = "Karl Preisner" }]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.16.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]

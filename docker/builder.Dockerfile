@@ -2,7 +2,7 @@
 # The builder: the `msr` CLI (msr-build + core + nlp + db). Run-and-exit, never long-running.
 #
 #   develop  the workspace with dev dependencies; compose-overrides/compose.builder-dev.yaml
-#            bind-mounts packages/ over it
+#            bind-mounts packages/ over it; it also runs the integration tests (the `test` service)
 #   builder  wheels for the member, its workspace dependencies, and its locked dependencies
 #   final    a slim image that installs only those wheels, as appuser (uid 1000)
 #
@@ -26,6 +26,10 @@ ENV UV_PROJECT_ENVIRONMENT=/venv \
     UV_LINK_MODE=copy \
     PATH=/venv/bin:$PATH
 WORKDIR /app
+# psql and envsubst, for the integration tests that run database/migration/migrate.sh.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client gettext-base \
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir /venv && chown appuser:appuser /app /venv
 USER appuser
 # Dependencies first, so a source change doesn't reinstall them.

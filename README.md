@@ -51,6 +51,7 @@ task py:lint              # ruff check and ruff format --check
 task py:typecheck         # strict mypy
 task py:format            # auto-format and apply safe lint fixes (alias: task py-format)
 task py:test              # pytest, e.g. task py:test -- -k walk (alias: task py-test)
+task py:test:integration  # integration tests in the compose `test` container, against scratch databases
 task check                # lint, typecheck, and test (py:check); task py-lint is lint + typecheck, as in CI
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
@@ -61,15 +62,22 @@ secrets and local overrides).
 
 ```bash
 task validate             # check that .env sets every [SECRET] in .env.static (creates .env if missing)
-task up                   # start the stack and wait until it is healthy
+task up                   # build, migrate, start the stack, and wait until it is healthy
 task status               # containers and their health
 task logs                 # logs, e.g. task logs -- rabbitmq; task logt follows them
 task exec -- <svc> <cmd>  # run a command in a service, e.g. task exec -- redis redis-cli
 task down                 # stop the stack (volumes are kept)
 task destroy              # also delete the volumes and the msr images (asks first; data/ is untouched)
-task db:psql              # psql in the postgres container
+task db:migrate           # apply new migrations and exit (a no-op when everything is applied)
+task db:psql              # psql as the read-only reader; ROLE=api|worker|builder|owner|superuser for others
 task db:reset             # delete and recreate the Postgres volume (asks first)
 ```
+
+Postgres holds the model and corpus registries, vocab, concepts, jobs, and search hits, all in the
+`msr` schema. Each service logs in as its own role (`msr_api_local`, …) with only the privileges
+it needs. The SQL migrations in `database/migration/` are the schema (no ORM): `001_postgres/`
+bootstraps the database and roles on every start, and each file in `002_migration/` runs once.
+An applied file never changes; a fix is a new file.
 
 Builder commands (see Building the Simple English model). Each runs `msr` in the builder
 container, and its `-native` twin runs the same command with uv; the arguments are the same.
@@ -78,6 +86,7 @@ container, and its `-native` twin runs the same command with uv; the arguments a
 task build:parse          # msr parse: raw text → term sets (build:parse-native with uv)
 task build:model          # msr model: term sets → model artifacts and X′ (build:model-native)
 task build:corpus         # msr corpus: raw data → a search corpus (build:corpus-native)
+task build:register -- model <id>   # register a built model (or: -- corpus <name>) in Postgres
 task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
 task dev:up               # start the stack with every compose-overrides/ dev override applied
 ```
@@ -93,7 +102,9 @@ commands below run from the repository root, and each block can be pasted into a
 The parse, corpus, and model steps use the native tasks (`build:*-native`). Dropping `-native`
 (`task build:parse`, `task build:corpus`, `task build:model`) runs the same command, with the same
 arguments, in the builder container instead, with `data/` mounted at `/data`; it produces the same
-artifacts.
+artifacts. In the container, `msr model` and `msr corpus` also register the result in Postgres, so
+the running stack can serve it. A native build skips that step; register it afterwards with
+`task build:register -- model <id>` or `task build:register -- corpus <name>`.
 
 ### 1. Download the raw data
 
@@ -153,6 +164,7 @@ task build:corpus-native -- ccnews --lang en
 Drops the 100 most frequent terms as stop words, builds C, M, S, and T, and walks the 51 reference
 nodes for X′, into `data/models/<id>/` (its `df_report.json` shows where other stop-word rules
 would cut). Rerunning the same command with the same `--id` resumes at the first unfinished stage.
+`--description` is free text shown with the model; rerunning with a new one replaces it.
 
 For local development, a small, fast model is enough. `--parts 10` uses the first 10 parsed parts
 (about 20,000 articles) and `--steps 100` walks 100 steps instead of 1,000; it builds in about 4
@@ -160,14 +172,15 @@ minutes. Concepts use the same step count automatically.
 
 ```bash
 task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name simplewiki-small --id simplewiki-small --parts 10 --steps 100
+  --name simplewiki-small --id simplewiki-small --parts 10 --steps 100 \
+  --description "Simple English Wikipedia 20231101, first 10 of 121 parts, 100 steps"
 ```
 
 All of Simple English with the paper's 1,000 steps (X′ takes hours on CPU):
 
 ```bash
 task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name simplewiki --id simplewiki-1
+  --name simplewiki --id simplewiki-1 --description "Simple English Wikipedia 20231101, all parts"
 ```
 
 ### 5. Concepts and search

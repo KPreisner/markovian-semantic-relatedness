@@ -1,61 +1,37 @@
 """The builder end to end on the toy: parse → model → concept, and WARC → corpus → search."""
 
+from collections.abc import Iterator
 from compression import zstd
 from pathlib import Path
 
 import numpy as np
 import orjson
-import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from msr.model.artifacts import load_model, read_manifest
+from msr.model.artifacts import load_model, read_manifest, write_manifest
 from msr.model.build import ModelParams, build_model
 from msr_build.cli import main
+from msr_build.parse import read_parse_manifest
+from msr_nlp.terms import TERM_RULES
 from tests.fixtures import toy
-from tests.fixtures.nlp import save_toy_pipeline
-from tests.fixtures.warc import Response, article_html, write_warc
+from tests.fixtures.builder import MODEL_ID, model_argv, parse_argv, parsed_dir, write_raw_data
 
-MODEL_ID = "toy-1"
 # No --steps: concepts use the λ the model's X′ was walked with (50 here).
 CONCEPT_ARGS = ["--model", MODEL_ID, "--threshold", "0"]
 
 
-def parsed_dir(data: Path) -> Path:
-    return data / "parsed" / "hf_wiki-20231101.toy" / "en_toy-0.0.1"
-
-
-def parse_argv(data: Path) -> list[str]:
-    wiki = str(data / "raw" / "hf_wiki" / "20231101.toy")
-    return ["parse", "wiki", wiki, "--pipeline", str(data / "nlp"), "--part-articles", "2"]
-
-
-def model_argv(data: Path) -> list[str]:
-    parsed = str(parsed_dir(data))
-    return ["model", parsed, "--id", MODEL_ID, "--stop-words", "none", "--steps", "50"]
+@pytest.fixture(scope="module", autouse=True)
+def native() -> Iterator[None]:
+    """Run as natively, with no database, so nothing is registered (see test_register)."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.delenv("MSR_DB_HOST", raising=False)
+        yield
 
 
 @pytest.fixture(scope="module")
 def data(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    root = tmp_path_factory.mktemp("data")
-    save_toy_pipeline(root / "nlp")
-    wiki = root / "raw" / "hf_wiki" / "20231101.toy"
-    wiki.mkdir(parents=True)
-    # The toy corpus as three articles of three paragraphs each.
-    texts = ["\n".join(toy.CORPUS[i : i + 3]) for i in range(0, 9, 3)]
-    table = pa.table({"id": ["1", "2", "3"], "title": ["a", "b", "c"], "text": texts})
-    pq.write_table(table, wiki / "train-00000-of-00001.parquet")
-    news = root / "raw" / "ccnews"
-    news.mkdir(parents=True)
-    paragraphs = [
-        "Every morning the cat sat in the hat by the window, watching birds in the garden "
-        "while the family made breakfast and argued about who would walk the dog.",
-        "Later that day the lost dog was found by a child near the park, where the wild "
-        "geese gather in autumn before flying south for the long winter months ahead.",
-    ]
-    response = Response("https://n.example/1", article_html("Cat", paragraphs))
-    write_warc(news / "CC-NEWS-toy.warc.gz", [response])
-    return root
+    return write_raw_data(tmp_path_factory.mktemp("data"))
 
 
 @pytest.fixture(scope="module")
@@ -78,6 +54,8 @@ def test_parse_writes_parts_and_df(built: Path) -> None:
         t: toy.C[i][i] for i, t in enumerate(toy.VOCAB)
     }
     assert dict(zip(df["term"], df["entity_df"], strict=True))["Bill G"] == 1
+    manifest = read_parse_manifest(parsed)
+    assert (manifest.components, manifest.term_rules) == (["ner"], TERM_RULES)
 
 
 def test_model_matches_the_toy(built: Path) -> None:
@@ -85,6 +63,8 @@ def test_model_matches_the_toy(built: Path) -> None:
     np.testing.assert_array_equal(model.c.toarray(), toy.C)
     manifest = read_manifest(built / "models" / MODEL_ID)
     assert set(manifest.build["stages"]) == {"model", "refs:degree-mean"}
+    assert manifest.reference_steps == {"degree-mean": 50}
+    assert manifest.build["parse"] == read_parse_manifest(parsed_dir(built)).model_dump(mode="json")
     assert (built / "models" / MODEL_ID / "refs" / "degree-mean" / "Xprime.npy").exists()
     assert (built / "models" / MODEL_ID / "df_report.json").exists()
 
@@ -133,6 +113,21 @@ def test_rerun_skips_finished_work(built: Path, capsys: pytest.CaptureFixture[st
     err = capsys.readouterr().err
     assert "is complete, skipping" in err
     assert "model: done, skipping" in err and "refs:degree-mean: done, skipping" in err
+
+
+def test_a_description_is_kept_on_resume_and_replaced_when_given(built: Path) -> None:
+    model_dir = built / "models" / MODEL_ID
+    original = read_manifest(model_dir)
+    try:
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setenv("MSR_DATA_DIR", str(built))
+            assert main([*model_argv(built), "--description", "toy corpus, 9 chunks"]) == 0
+            assert read_manifest(model_dir).description == "toy corpus, 9 chunks"
+            assert main(model_argv(built)) == 0
+            assert read_manifest(model_dir).description == "toy corpus, 9 chunks"
+        assert read_manifest(model_dir).build["stages"] == original.build["stages"]
+    finally:
+        write_manifest(model_dir, original)
 
 
 def test_concept_prints_a_table_and_caches(built: Path, capsys: pytest.CaptureFixture[str]) -> None:
