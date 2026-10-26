@@ -21,8 +21,9 @@ tmp/
 # Downloaded data and built model artifacts
 data/
 
-# Secrets / local config
+# Secrets / local config, and personal tasks
 .env
+taskfiles/udt.yml
 
 # OS / editors
 .DS_Store

@@ -1,0 +1,69 @@
+version: "3"
+
+# The Compose stack. Included flattened, so these run as `task up`, `task logs`, and so on.
+
+tasks:
+  validate:
+    desc: Check that .env sets every [SECRET] placeholder in .env.static (creates .env if missing)
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - test -f .env || touch .env
+      - |
+        missing=""
+        for name in $(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)="\[SECRET\].*/\1/p' .env.static); do
+          value=$(sed -n "s/^$name=//p" .env | tail -n 1)
+          case "$value" in
+            ""|'""'|"''"|'"[SECRET]'*) missing="$missing $name" ;;
+          esac
+        done
+        if [ -n "$missing" ]; then
+          echo "Set these secrets in .env (see .env.static for where to get each):" >&2
+          for name in $missing; do echo "  $name" >&2; done
+          exit 1
+        fi
+    silent: true
+
+  up:
+    desc: Start the stack in the background and wait until it is healthy
+    dir: "{{.ROOT_DIR}}"
+    deps: [validate]
+    cmds:
+      - docker compose up -d --wait {{.CLI_ARGS}}
+
+  down:
+    desc: Stop the stack (volumes are kept)
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose down {{.CLI_ARGS}}
+
+  destroy:
+    desc: Stop the stack and remove its volumes and locally built images (data/ is untouched)
+    dir: "{{.ROOT_DIR}}"
+    prompt: This deletes the Postgres, RabbitMQ, and Redis volumes and the msr images. Continue?
+    cmds:
+      - docker compose --profile build down --volumes --rmi local --remove-orphans
+      - docker image rm -f msr-builder:develop
+
+  logs:
+    desc: "Show logs (e.g. -- postgres)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs {{.CLI_ARGS}}
+
+  logt:
+    desc: "Follow logs from the last 100 lines (e.g. -- rabbitmq)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs --follow --tail 100 {{.CLI_ARGS}}
+
+  exec:
+    desc: "Run a command in a running service (e.g. -- redis redis-cli)"
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec {{.CLI_ARGS}}
+
+  status:
+    desc: Show the stack's containers and their health
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose ps --all

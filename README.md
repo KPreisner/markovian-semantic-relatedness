@@ -41,24 +41,59 @@ Tests live in `tests/<import name>/`.
 
 ## Development
 
-Requires [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.dev).
+Requires [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.dev), plus Docker with
+Compose for the stack and the builder container. The tasks live in `taskfiles/` (one module per
+area); `task` with no arguments lists them all. Extra arguments go after `--`.
 
 ```bash
-task uv-sync              # create .venv from uv.lock
-task py-lint              # ruff check, ruff format --check, mypy (same as CI)
-task py-format            # auto-format and apply safe lint fixes
-task py-test              # pytest; extra args after --, e.g. task py-test -- -k walk
-task msr -- <args>        # run the msr CLI, e.g. task msr -- concept trumpet --model <id>
-task build:parse-native   # msr parse: raw text → term sets (see Building the Simple English model)
-task build:model-native   # msr model: term sets → model artifacts and X′
-task build:corpus-native  # msr corpus: raw data → a search corpus
-task                      # list all tasks
+task py:sync              # create .venv from uv.lock (alias: task uv-sync)
+task py:lint              # ruff check and ruff format --check
+task py:typecheck         # strict mypy
+task py:format            # auto-format and apply safe lint fixes (alias: task py-format)
+task py:test              # pytest, e.g. task py:test -- -k walk (alias: task py-test)
+task check                # lint, typecheck, and test (py:check); task py-lint is lint + typecheck, as in CI
+task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
+
+The stack (Postgres, RabbitMQ, and Redis so far) runs in Docker Compose. Nothing is published to
+the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
+secrets and local overrides).
+
+```bash
+task validate             # check that .env sets every [SECRET] in .env.static (creates .env if missing)
+task up                   # start the stack and wait until it is healthy
+task status               # containers and their health
+task logs                 # logs, e.g. task logs -- rabbitmq; task logt follows them
+task exec -- <svc> <cmd>  # run a command in a service, e.g. task exec -- redis redis-cli
+task down                 # stop the stack (volumes are kept)
+task destroy              # also delete the volumes and the msr images (asks first; data/ is untouched)
+task db:psql              # psql in the postgres container
+task db:reset             # delete and recreate the Postgres volume (asks first)
+```
+
+Builder commands (see Building the Simple English model). Each runs `msr` in the builder
+container, and its `-native` twin runs the same command with uv; the arguments are the same.
+
+```bash
+task build:parse          # msr parse: raw text → term sets (build:parse-native with uv)
+task build:model          # msr model: term sets → model artifacts and X′ (build:model-native)
+task build:corpus         # msr corpus: raw data → a search corpus (build:corpus-native)
+task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
+task dev:up               # start the stack with every compose-overrides/ dev override applied
+```
+
+Personal tasks go in `taskfiles/udt.yml` (gitignored; start from `taskfiles/udt.sample.yml`) and
+show up as `udt:<name>`.
 
 ## Building the Simple English model
 
 Everything large lives under `data/` (gitignored; set `MSR_DATA_DIR` to put it elsewhere). The
 commands below run from the repository root, and each block can be pasted into a shell as is.
+
+The parse, corpus, and model steps use the native tasks (`build:*-native`). Dropping `-native`
+(`task build:parse`, `task build:corpus`, `task build:model`) runs the same command, with the same
+arguments, in the builder container instead, with `data/` mounted at `/data`; it produces the same
+artifacts.
 
 ### 1. Download the raw data
 

@@ -1,0 +1,9 @@
+# The builder from source: the `develop` target with packages/ bind-mounted over the image's copy,
+# so code changes take effect on the next run without a rebuild. Dependency changes still need one.
+services:
+  builder:
+    image: msr-builder:develop
+    build:
+      target: develop
+    volumes:
+      - ./packages:/app/packages

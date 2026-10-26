@@ -1,0 +1,32 @@
+version: "3"
+
+# Dev runtime: compose-overrides/compose.<service>-dev.yaml switches a service to its develop
+# target with the source bind-mounted.
+
+vars:
+  OVERRIDES:
+    sh: cd "{{.ROOT_DIR}}" && ls compose-overrides/compose.*-dev.yaml
+
+tasks:
+  up:
+    desc: Start the stack with every dev override applied
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose -f compose.yaml {{range splitLines .OVERRIDES}}{{if .}}-f {{.}} {{end}}{{end}}up -d --wait --build
+
+  up:*:
+    desc: "Start the stack with one service's dev override (e.g. dev:up:api)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    vars:
+      SERVICE: "{{index .MATCH 0}}"
+    cmds:
+      - docker compose -f compose.yaml -f compose-overrides/compose.{{.SERVICE}}-dev.yaml up -d --wait --build
+
+  builder:
+    desc: "Run the msr CLI in the builder from source (e.g. -- model … --name toy)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose -f compose.yaml -f compose-overrides/compose.builder-dev.yaml run --rm --build builder msr {{.CLI_ARGS}}

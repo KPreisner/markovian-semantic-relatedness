@@ -1,0 +1,36 @@
+version: "3"
+
+tasks:
+  sync:
+    desc: Install/update the virtual environment from uv.lock
+    cmds:
+      - uv sync
+
+  lint:
+    desc: ruff check and ruff format --check
+    cmds:
+      - uv run ruff check
+      - uv run ruff format --check
+
+  format:
+    desc: Auto-format and apply safe lint fixes (incl. import sorting)
+    cmds:
+      - uv run ruff check --fix
+      - uv run ruff format
+
+  typecheck:
+    desc: Strict mypy
+    cmds:
+      - uv run mypy
+
+  test:
+    desc: "Run unit tests (extra args after --, e.g. -- -k walk)"
+    cmds:
+      - uv run pytest {{.CLI_ARGS}}
+
+  check:
+    desc: lint, typecheck, and test
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
