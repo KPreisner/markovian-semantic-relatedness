@@ -53,5 +53,9 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Integration tests need the compose Postgres and run in the `test` container
+# (`task py:test:integration`, which passes `-m integration` and so overrides this default).
+addopts = ["-m", "not integration"]
+markers = ["integration: needs the compose stack (task py:test:integration)"]
 # fastwarc warns about its own legacy shims on import.
 filterwarnings = ["ignore::DeprecationWarning:fastwarc.legacy._shims"]

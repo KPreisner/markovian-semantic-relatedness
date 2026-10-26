@@ -28,6 +28,14 @@ tasks:
     cmds:
       - uv run pytest {{.CLI_ARGS}}
 
+  test:integration:
+    desc: "Integration tests in the compose `test` container, against the stack's Postgres (e.g. -- -k roles)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose --profile test build test
+      - docker compose run --rm test pytest -m integration {{.CLI_ARGS}}
+
   check:
     desc: lint, typecheck, and test
     cmds:

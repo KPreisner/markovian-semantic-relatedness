@@ -13,7 +13,9 @@ tasks:
     dir: "{{.ROOT_DIR}}"
     deps: [":validate"]
     cmds:
-      - docker compose -f compose.yaml {{range splitLines .OVERRIDES}}{{if .}}-f {{.}} {{end}}{{end}}up -d --wait --build
+      - task: :start
+        vars:
+          FILES: -f compose.yaml {{range splitLines .OVERRIDES}}{{if .}}-f {{.}} {{end}}{{end}}
 
   up:*:
     desc: "Start the stack with one service's dev override (e.g. dev:up:api)"
@@ -22,11 +24,14 @@ tasks:
     vars:
       SERVICE: "{{index .MATCH 0}}"
     cmds:
-      - docker compose -f compose.yaml -f compose-overrides/compose.{{.SERVICE}}-dev.yaml up -d --wait --build
+      - task: :start
+        vars:
+          FILES: -f compose.yaml -f compose-overrides/compose.{{.SERVICE}}-dev.yaml
 
   builder:
     desc: "Run the msr CLI in the builder from source (e.g. -- model … --name toy)"
     dir: "{{.ROOT_DIR}}"
     deps: [":validate"]
     cmds:
-      - docker compose -f compose.yaml -f compose-overrides/compose.builder-dev.yaml run --rm --build builder msr {{.CLI_ARGS}}
+      - docker compose -f compose.yaml -f compose-overrides/compose.builder-dev.yaml --profile build build builder
+      - docker compose -f compose.yaml -f compose-overrides/compose.builder-dev.yaml run --rm builder msr {{.CLI_ARGS}}

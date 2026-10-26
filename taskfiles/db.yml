@@ -1,18 +1,38 @@
 version: "3"
 
-# Postgres. Service roles and the migration runner (db:migrate) arrive with the migrations; until
-# then psql connects as the superuser.
+# Postgres: the migration runner and psql. The superuser is for bootstrap and emergencies; day to
+# day, connect as a service role or as the read-only reader.
 
 tasks:
+  migrate:
+    desc: Apply new migrations (database/migration/) and exit; a no-op when everything is applied
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - docker compose build postgres
+      - docker compose run --rm migrate
+
   psql:
-    desc: "Open psql in the postgres container (extra psql args after --)"
+    desc: "psql in the postgres container as a role: ROLE=reader|api|worker|builder|owner|superuser (default reader; extra psql args after --)"
     dir: "{{.ROOT_DIR}}"
     interactive: true
+    vars:
+      ROLE: '{{.ROLE | default "reader"}}'
+    preconditions:
+      - sh: echo " reader api worker builder owner superuser " | grep -q " {{.ROLE}} "
+        msg: "ROLE must be one of reader, api, worker, builder, owner, superuser"
     cmds:
-      - docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' psql {{.CLI_ARGS}}
+      - >-
+        docker compose exec postgres sh -c '
+        case "$0" in
+        superuser) user=$POSTGRES_USER; db=$POSTGRES_DB ;;
+        reader) user=data_reader_$MSR_ENV; db=$MSR_DB_NAME ;;
+        *) user=msr_$0_$MSR_ENV; db=$MSR_DB_NAME ;;
+        esac;
+        exec psql -U "$user" -d "$db" "$@"' {{.ROLE}} {{.CLI_ARGS}}
 
   reset:
-    desc: Delete the Postgres volume and start a fresh, empty database
+    desc: Delete the Postgres volume, then start and migrate a fresh database
     dir: "{{.ROOT_DIR}}"
     prompt: This deletes every table and row in the local Postgres. Continue?
     cmds:

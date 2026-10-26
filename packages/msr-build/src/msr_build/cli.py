@@ -5,15 +5,19 @@
     msr corpus ccnews CC-NEWS WARCs → JSONL search corpus       (data/corpora/)
     msr concept       a root term's concept table               (data/concepts/)
     msr search        rank a corpus's paragraphs with concepts  (data/searches/)
+    msr register      a built model or a corpus → Postgres
 
-Paths default to the `data/` tree (`MSR_DATA_DIR`).
+Paths default to the `data/` tree (`MSR_DATA_DIR`). `msr model` and `msr corpus` end by
+registering what they built when a database is configured (`MSR_DB_HOST`, set in containers);
+native runs skip that step, and `msr register` in the builder catches up.
 """
 
 import argparse
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 import msr
 from msr.concept.build import ConceptParams
@@ -22,6 +26,7 @@ from msr.model.build import ModelParams
 from msr.model.references import DegreeMean, Strategy, parse_strategy
 from msr.model.stopwords import parse_rule
 from msr_build.paths import DataDir
+from msr_db.settings import DatabaseSettings, database_configured
 
 
 def _log(message: str) -> None:
@@ -31,6 +36,17 @@ def _log(message: str) -> None:
 def _workers(value: str) -> int:
     n = int(value)
     return n if n > 0 else max(1, (os.cpu_count() or 2) - 1)
+
+
+def _register(what: str, register: Callable[[Any], None]) -> None:
+    """Run `register` on a builder connection, or say how to catch up without a database."""
+    if not database_configured():
+        _log(f"register: skipped (no database configured); run `task build:register -- {what}`")
+        return
+    import psycopg
+
+    with psycopg.connect(DatabaseSettings().conninfo("builder")) as conn:
+        register(conn)
 
 
 def _concept_args(p: argparse.ArgumentParser) -> None:
@@ -68,6 +84,9 @@ def _parser() -> argparse.ArgumentParser:
     model.add_argument("parsed", type=Path, help="e.g. data/parsed/hf_wiki-…/en_core_web_lg-3.8.0")
     model.add_argument("--name", default="model", help="model name; the id adds a timestamp")
     model.add_argument("--id", help="model id to create or resume")
+    model.add_argument(
+        "--description", help="free text: what the model is made from and why (kept on resume)"
+    )
     model.add_argument("--stop-words", type=parse_rule, default=parse_rule("top:100"))
     model.add_argument("--truncation", type=int, default=1000, help="t, entries per row of T")
     model.add_argument(
@@ -107,11 +126,16 @@ def _parser() -> argparse.ArgumentParser:
     search.add_argument("--top-k", type=int, default=100, help="concept terms used (10–1000)")
     search.add_argument("--rows", type=int, default=10, help="hits to print")
     search.add_argument("--workers", type=_workers, default=1, help="scan processes (0: all)")
+
+    reg = sub.add_parser("register", help="register a built model or a corpus in Postgres")
+    reg_sub = reg.add_subparsers(dest="kind", required=True)
+    reg_sub.add_parser("model", help="a model under data/models/").add_argument("id")
+    reg_sub.add_parser("corpus", help="a corpus under data/corpora/").add_argument("name")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    from msr_build import corpus, model, parse, query  # heavy imports only for real commands
+    from msr_build import corpus, model, parse, query, register  # heavy imports: real commands
 
     parser = _parser()
     args = parser.parse_args(argv)
@@ -133,11 +157,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         case "model":
             strategies: list[Strategy] = args.refs or [DegreeMean()]
-            model.build_model(
+            out = model.build_model(
                 args.parsed,
                 data.models,
                 name=args.name,
                 model_id=args.id,
+                description=args.description,
                 params=ModelParams(stop_words=args.stop_words, truncation=args.truncation),
                 strategies=strategies,
                 steps=args.steps,
@@ -147,8 +172,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 force_stages=frozenset(args.force_stage),
                 log=_log,
             )
+            _register(f"model {out.name}", lambda c: register.register_model(c, out, log=_log))
         case "corpus":
-            corpus.prep_ccnews(
+            out = corpus.prep_ccnews(
                 args.input or data.raw / "ccnews",
                 data.corpora,
                 name=args.name or f"ccnews-{args.lang}",
@@ -157,6 +183,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 force=args.force,
                 log=_log,
             )
+            _register(f"corpus {out.name}", lambda c: register.register_corpus(c, out, log=_log))
+        case "register":
+            if args.kind == "model":
+                model_dir = data.models / args.id
+                _register(
+                    f"model {args.id}", lambda c: register.register_model(c, model_dir, log=_log)
+                )
+            else:
+                corpus_dir = data.corpora / args.name
+                _register(
+                    f"corpus {args.name}",
+                    lambda c: register.register_corpus(c, corpus_dir, log=_log),
+                )
         case "concept":
             model_dir = data.models / args.model
             m = load_model(model_dir)

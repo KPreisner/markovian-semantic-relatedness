@@ -18,6 +18,7 @@ import pyarrow.parquet as pq
 
 from msr.model.artifacts import (
     ModelManifest,
+    built_reference_steps,
     load_model,
     read_manifest,
     save_model,
@@ -94,6 +95,7 @@ def build_model(
     *,
     name: str,
     model_id: str | None = None,
+    description: str | None = None,
     params: ModelParams | None = None,
     strategies: Sequence[Strategy] = (),
     steps: int = 1000,
@@ -105,18 +107,21 @@ def build_model(
 ) -> Path:
     """Build or resume a model. `per_language` runs the stop-word rule separately per language
     (any CJK character means zh), for bilingual models. `max_parts` builds from only the first N
-    parsed parts, for a small, fast model; df is then counted over those parts."""
+    parsed parts, for a small, fast model; df is then counted over those parts. `description`
+    replaces the stored one; `None` keeps it (empty for a new model)."""
     params = params or ModelParams()
     parse = read_parse_manifest(parsed)
     model_id = model_id or new_model_id(name)
     out = models_root / model_id
     build: dict[str, Any] = {
+        "name": name,
         "parsed": parsed.as_posix(),
         "source": parse.source,
         "pipeline": parse.pipeline,
         "pipeline_version": parse.pipeline_version,
         "stop_words_per_language": per_language,
         "max_parts": max_parts,
+        "parse": parse.model_dump(mode="json"),
         "stages": {},
     }
     if (out / "manifest.json").exists():
@@ -128,6 +133,8 @@ def build_model(
         if existing.params != params or not same_inputs:
             raise ValueError(f"{out} was built from other inputs or params; use a new --id")
         build = existing.build
+        description = existing.description if description is None else description
+    description = description or ""
     out.mkdir(parents=True, exist_ok=True)
     log(f"model: {model_id}")
     stages: dict[str, Any] = build["stages"]
@@ -156,7 +163,14 @@ def build_model(
 
     def checkpoint() -> None:
         assert model is not None
-        write_manifest(out, ModelManifest.describe(model, model_id, build))
+        manifest = ModelManifest.describe(
+            model,
+            model_id,
+            build,
+            description=description,
+            reference_steps=built_reference_steps(out),
+        )
+        write_manifest(out, manifest)
 
     if run_stage("model", out, stages, matrices, force="model" in force_stages, log=log):
         checkpoint()
@@ -175,6 +189,9 @@ def build_model(
             model = model or load_model(out)
             checkpoint()
     manifest = read_manifest(out)
+    if manifest.description != description:  # a new description on a finished model
+        manifest = manifest.model_copy(update={"description": description})
+        write_manifest(out, manifest)
     log(
         f"model: {manifest.terms:,} terms, {manifest.components:,} components "
         f"(largest {manifest.largest_component_size:,}), "

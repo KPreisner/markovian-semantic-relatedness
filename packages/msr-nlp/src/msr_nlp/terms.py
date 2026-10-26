@@ -10,6 +10,13 @@ from dataclasses import dataclass
 
 from spacy.tokens import Doc
 
+TERM_RULES = (
+    "unique token texts plus named-entity spans (inner whitespace collapsed), case-sensitive; "
+    "tokens with no letter or digit dropped; no stop-word removal"
+)
+"""How `term_set` turns a chunk into terms, recorded in each parse's manifest. Update it whenever
+`term_set` changes."""
+
 
 @dataclass(frozen=True)
 class TermSet:

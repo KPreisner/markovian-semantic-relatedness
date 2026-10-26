@@ -19,10 +19,10 @@ from typing import Any, cast
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from msr_nlp.pipelines import load_pipeline, pipeline_info
-from msr_nlp.terms import term_set
+from msr_nlp.terms import TERM_RULES, term_set
 from msr_nlp.wikipedia import articles, chunks, parquet_files
 
 PARSE_MANIFEST = "parse.json"
@@ -47,6 +47,10 @@ class ParseManifest(BaseModel):
     source: str
     pipeline: str
     pipeline_version: str
+    components: list[str] = Field(default_factory=list)
+    """The pipeline components that ran. Empty in manifests written before it was recorded."""
+    term_rules: str = ""
+    """How chunks became terms (`msr_nlp.terms.TERM_RULES`). Empty in older manifests."""
     part_articles: int
     articles: int
     parts: int
@@ -138,6 +142,8 @@ def parse_wikipedia(
         source=source.as_posix(),
         pipeline=info.name,
         pipeline_version=info.version,
+        components=list(info.components),
+        term_rules=TERM_RULES,
         part_articles=part_articles,
         articles=total,
         parts=-(-total // part_articles),

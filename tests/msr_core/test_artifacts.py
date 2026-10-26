@@ -9,6 +9,7 @@ from msr.concept.build import ConceptParams, build_concept
 from msr.concept.storage import CONCEPT_VERSION, concept_key, load_concept, save_concept
 from msr.model.artifacts import (
     ModelManifest,
+    built_reference_steps,
     load_model,
     load_references,
     references_dir,
@@ -65,6 +66,7 @@ def test_references_round_trip(model: Model, tmp_path: Path) -> None:
         np.testing.assert_array_equal(loaded.nodes, refs.nodes)
         np.testing.assert_array_equal(loaded.xprime, refs.xprime)
     assert references_dir(tmp_path, Random(7)).name == "random-7"
+    assert built_reference_steps(tmp_path) == {str(DegreeMean()): 20, str(Random(7)): 20}
 
 
 def test_concept_round_trip(model: Model, tmp_path: Path) -> None:

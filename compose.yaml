@@ -7,7 +7,8 @@ x-env-files: &env-files
 
 services:
   postgres:
-    image: postgres:18.6-trixie
+    image: msr-db:latest
+    build: database
     <<: *env-files
     volumes:
       # Postgres 18 images keep PGDATA in a version subdirectory of /var/lib/postgresql.
@@ -19,6 +20,21 @@ services:
       timeout: 2s
       retries: 30
       start_period: 10s
+
+  # One-shot: applies database/migration/ and exits. Everything that uses Postgres waits for it.
+  migrate:
+    # Built by the postgres service: two services building one tag make each build replace the
+    # other's image, which recreates postgres on every `compose build`.
+    image: msr-db:latest
+    pull_policy: never
+    <<: *env-files
+    environment:
+      PGHOST: postgres
+    command: ["/migration/migrate.sh"]
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   rabbitmq:
     image: rabbitmq:4.4.0-management
@@ -61,6 +77,34 @@ services:
     volumes:
       - ${MSR_DATA_DIR:-./data}:/data
     networks: [backend, egress]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Integration tests (`task py:test:integration`): the builder's develop image with the source,
+  # tests, and migrations mounted, on the backend network where Postgres is reachable. The tests
+  # create and drop their own scratch databases.
+  test:
+    image: msr-builder:develop
+    build:
+      context: .
+      dockerfile: docker/builder.Dockerfile
+      target: develop
+    profiles: [test]
+    <<: *env-files
+    environment:
+      MSR_DATA_DIR: /tmp/data
+    working_dir: /app
+    command: ["pytest", "-m", "integration"]
+    volumes:
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./packages:/app/packages
+      - ./tests:/app/tests
+      - ./database:/app/database:ro
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:

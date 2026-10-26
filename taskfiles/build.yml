@@ -1,16 +1,24 @@
 version: "3"
 
 # Builder commands. Each runs `msr` in the builder container (`docker compose run --rm builder`,
-# rebuilding the image if the source changed), and its -native twin runs it with uv. Arguments
-# after `--` go to `msr`; `data/...` paths mean the same thing in both.
+# after rebuilding the image if the source changed), and its -native twin runs it with uv.
+# Arguments after `--` go to `msr`; `data/...` paths mean the same thing in both.
 
 tasks:
+  run:
+    internal: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose --profile build build builder
+      - docker compose run --rm builder msr {{.ARGS}}
+
   parse:
     desc: "NLP-parse a source into term sets in the builder (e.g. -- wiki data/raw/hf_wiki/20231101.simple --pipeline data/nlp/en_core_web_lg)"
     dir: "{{.ROOT_DIR}}"
     deps: [":validate"]
     cmds:
-      - docker compose run --rm --build builder msr parse {{.CLI_ARGS}}
+      - task: run
+        vars: {ARGS: "parse {{.CLI_ARGS}}"}
 
   parse-native:
     desc: "NLP-parse a source into term sets with uv"
@@ -22,7 +30,8 @@ tasks:
     dir: "{{.ROOT_DIR}}"
     deps: [":validate"]
     cmds:
-      - docker compose run --rm --build builder msr model {{.CLI_ARGS}}
+      - task: run
+        vars: {ARGS: "model {{.CLI_ARGS}}"}
 
   model-native:
     desc: "Build or resume a model with uv"
@@ -34,9 +43,18 @@ tasks:
     dir: "{{.ROOT_DIR}}"
     deps: [":validate"]
     cmds:
-      - docker compose run --rm --build builder msr corpus {{.CLI_ARGS}}
+      - task: run
+        vars: {ARGS: "corpus {{.CLI_ARGS}}"}
 
   corpus-native:
     desc: "Prepare a search corpus with uv"
     cmds:
       - uv run msr corpus {{.CLI_ARGS}}
+
+  register:
+    desc: "Register a built model or a prepared corpus in Postgres (e.g. -- model simplewiki-small, -- corpus ccnews-en)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - task: run
+        vars: {ARGS: "register {{.CLI_ARGS}}"}
