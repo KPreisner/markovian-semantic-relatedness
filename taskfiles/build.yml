@@ -1,0 +1,20 @@
+version: "3"
+
+# Builder commands run natively with uv. The Docker variants (`docker compose run --rm builder
+# msr …`) arrive with the builder container in Phase 5. Arguments after `--` go to `msr`.
+
+tasks:
+  parse-native:
+    desc: "NLP-parse a source into term sets (e.g. -- wiki data/raw/hf_wiki/20231101.simple --pipeline data/nlp/en_core_web_lg)"
+    cmds:
+      - uv run msr parse {{.CLI_ARGS}}
+
+  model-native:
+    desc: "Build or resume a model from parsed term sets (e.g. -- data/parsed/<source>/<pipeline> --name simplewiki)"
+    cmds:
+      - uv run msr model {{.CLI_ARGS}}
+
+  corpus-native:
+    desc: "Prepare a search corpus (e.g. -- ccnews --lang en)"
+    cmds:
+      - uv run msr corpus {{.CLI_ARGS}}

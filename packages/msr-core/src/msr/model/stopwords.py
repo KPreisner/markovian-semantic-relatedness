@@ -1,13 +1,13 @@
 """Stop-word rules. Data-agnostic: they look only at chunk frequency (df), never at the terms.
 
 A rule picks the terms to drop before C is built. Rules run per group when a grouping function is
-given (e.g. per language for bilingual models), and never drop protected terms: protected terms are
-removed from consideration before the rule ranks or thresholds anything.
+given (e.g. per language for bilingual models). Every term is treated alike: a token and an entity
+span are both just terms.
 """
 
 import math
 from collections import defaultdict
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -125,14 +125,11 @@ def select_stop_words(
     *,
     n_chunks: int,
     group: Callable[[str], str] | None = None,
-    protected: Collection[str] = (),
 ) -> frozenset[str]:
     """The terms the rule drops. `n_chunks` is the chunk count df was taken over (for `maxdf`)."""
     if rule is None:
         return frozenset()
-    keep = frozenset(protected)
     groups: defaultdict[str, dict[str, int]] = defaultdict(dict)
     for term, d in df.items():
-        if term not in keep:
-            groups[group(term) if group else ""][term] = d
+        groups[group(term) if group else ""][term] = d
     return frozenset().union(*(_apply(rule, g, n_chunks) for g in groups.values()))

@@ -23,9 +23,15 @@ def hitting_times(
 
     The first step uses S (via C and rowsum(M)) and later steps use T (§4.2.3), so terms that
     co-occur with the root can reach it even when truncation dropped that edge.
+
+    A root's distance to itself is 0, the textbook hitting time. Eqs. 11–18 as printed give it a
+    return time instead, which on real models is barely shorter than its distance to the
+    references, so its z (the scaling weight w_r) lands near 0 and blows up every other weight.
+    With 0, w_r = μᵣ/σᵣ, which is positive and of the size the paper's tables imply.
     """
     r = np.asarray(roots, dtype=np.intp)
     alpha1 = first_step(model.c, model.rowsum_m, r)
     v = (backend or CpuBackend()).hitting_times(model.t, alpha1, steps, progress)
     v[model.labels[:, None] != model.labels[r][None, :]] = np.nan
+    v[r, np.arange(len(r))] = 0.0
     return v

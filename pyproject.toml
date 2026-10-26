@@ -10,7 +10,14 @@ requires-python = ">=3.14"
 dependencies = ["msr-core", "msr-nlp", "msr-db", "msr-api", "msr-worker", "msr-build"]
 
 [dependency-groups]
-dev = ["ruff>=0.17", "mypy>=2.4", "pytest>=9.0", "hypothesis>=6.170", "scipy-stubs>=1.18"]
+dev = [
+    "ruff>=0.17",
+    "mypy>=2.4",
+    "pytest>=9.0",
+    "hypothesis>=6.170",
+    "scipy-stubs>=1.18",
+    "pyarrow-stubs>=20.0",
+]
 
 [tool.uv]
 package = false
@@ -46,3 +53,5 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# fastwarc warns about its own legacy shims on import.
+filterwarnings = ["ignore::DeprecationWarning:fastwarc.legacy._shims"]

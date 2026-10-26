@@ -68,15 +68,15 @@ def test_toy_stats_match_a_slow_trim(model: Model, references: References) -> No
 
 # Cross-checked by the slow trim above; frozen after review. Root "cat", degree-mean, R = 0.2.
 GOLDEN_Z_CAT = {
-    "cat": 1.5505,
-    "child": -0.461,
-    "dog": -0.9323,
-    "fat": 2.694,
-    "hat": 1.7881,
-    "in": 1.7291,
-    "lost": -0.6254,
-    "the": 1.284,
-    "wild": -0.6747,
+    "cat": 2.9516,  # μ/σ: the root's distance to itself is 0
+    "child": -0.4989,
+    "dog": -0.9368,
+    "fat": 2.0843,
+    "hat": 1.3317,
+    "in": 1.6074,
+    "lost": -0.6273,
+    "the": 1.2496,
+    "wild": -0.7565,
 }
 
 
@@ -89,10 +89,10 @@ def test_toy_z_golden_values_for_cat(model: Model, references: References) -> No
 
 def test_toy_concept_for_cat(model: Model, references: References) -> None:
     c = concept(model, references, "cat", threshold=0.0)
-    # z ≥ 0 keeps the, fat, hat, in; sorted by co-occurrence with cat, then z.
-    assert model.vocab.lookup(c.term_idx.tolist()) == ["cat", "the", "fat", "hat", "in"]
+    # z ≥ 0 keeps the, fat, in, hat; sorted by co-occurrence with cat, then z.
+    assert model.vocab.lookup(c.term_idx.tolist()) == ["cat", "the", "fat", "in", "hat"]
     np.testing.assert_array_equal(c.cooccur, [3, 3, 1, 1, 1])
-    np.testing.assert_allclose(c.weight, [100.0, 82.8079, 173.7466, 115.3195, 111.5183], atol=5e-4)
+    np.testing.assert_allclose(c.weight, [100.0, 42.3353, 70.6169, 54.4588, 45.1179], atol=5e-4)
     assert c.term_idx.dtype == np.int32 and c.weight.dtype == np.float32
     assert c.cooccur.dtype == np.int32
 

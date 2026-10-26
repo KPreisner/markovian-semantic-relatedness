@@ -179,7 +179,9 @@ class _Scanner:
                 best = _Best(chunk, score, tuple(sums), lines[chunk], starts[chunk], hits)
         return best
 
-    def scan(self, shard: Shard, config: CorpusConfig, top_n: int) -> tuple[list[Hit], ScanStats]:
+    def scan(
+        self, shard: Shard, config: CorpusConfig, top_n: int | None
+    ) -> tuple[list[Hit], ScanStats]:
         stats = ScanStats(shards=1)
         heap: list[tuple[float, int, int, Hit]] = []
         for doc in documents(shard, config):
@@ -191,7 +193,7 @@ class _Scanner:
             stats.matched_documents += 1
             # A min-heap on (score, later position first) keeps the top N, earliest on ties.
             key = (best.score, -shard.file_index, -doc.offset)
-            if len(heap) < top_n or key > heap[0][:3]:
+            if top_n is None or len(heap) < top_n or key > heap[0][:3]:
                 hit = Hit(
                     shard.relpath,
                     doc.doc_id,
@@ -203,7 +205,7 @@ class _Scanner:
                     best.matches(),
                 )
                 entry = (*key, hit)
-                if len(heap) < top_n:
+                if top_n is None or len(heap) < top_n:
                     heapq.heappush(heap, entry)
                 else:
                     heapq.heapreplace(heap, entry)
@@ -219,12 +221,14 @@ def _init_worker(pats: Patterns, n_concepts: int) -> None:
     _worker = _Scanner(pats, n_concepts, automaton(pats))
 
 
-def _scan_in_worker(shard: Shard, config: CorpusConfig, top_n: int) -> tuple[list[Hit], ScanStats]:
+def _scan_in_worker(
+    shard: Shard, config: CorpusConfig, top_n: int | None
+) -> tuple[list[Hit], ScanStats]:
     assert _worker is not None
     return _worker.scan(shard, config, top_n)
 
 
-def rank_hits(hits: list[Hit], file_order: dict[str, int], top_n: int) -> list[Hit]:
+def rank_hits(hits: list[Hit], file_order: dict[str, int], top_n: int | None) -> list[Hit]:
     return sorted(hits, key=lambda h: (-h.score, file_order[h.file], h.offset))[:top_n]
 
 
@@ -232,12 +236,12 @@ def search(
     root: Path,
     concepts: Sequence[SearchConcept],
     *,
-    top_n: int = 100,
+    top_n: int | None = 100,
     workers: int = 1,
     shard_bytes: int = DEFAULT_SHARD_BYTES,
     progress: Progress | None = None,
 ) -> SearchResult:
-    """Score every document under `root` and return the top N, best first.
+    """Score every document under `root` and return the top N (every match if None), best first.
 
     Ties keep corpus order (file path, then position in the file). `workers=1` scans in-process.
     """

@@ -1,11 +1,17 @@
 [project]
 name = "msr-nlp"
 version = "0.1.0"
-description = "MSR NLP: spaCy pipelines, term sets, stop words, and dataset readers."
+description = "MSR NLP: spaCy pipelines, term sets, and dataset readers."
 license = "LicenseRef-PolyForm-Strict-1.0.0"
 authors = [{ name = "Karl Preisner" }]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "spacy>=3.8.16,<3.9",
+    "pyarrow>=26.0",
+    "trafilatura>=2.3",
+    "lingua-language-detector>=2.2",
+    "fastwarc>=1.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
