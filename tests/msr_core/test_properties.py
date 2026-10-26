@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 from msr.model.build import ModelParams, build_model
 from msr.model.stopwords import TopK
-from msr.model.transition import first_step, truncated
+from msr.model.transition import first_step, standardized, truncated
 from msr.walk.cpu import walk_states
 
 term_sets = st.lists(
@@ -51,3 +51,27 @@ def test_beta_is_monotone_and_bounded(chunks: list[set[str]], t: int) -> None:
     for _, _, beta, _ in walk_states(model.t, first_step(model.c, model.rowsum_m, roots), 50):
         assert (beta >= previous - 1e-12).all() and (beta <= 1 + 1e-12).all()
         previous = beta.copy()
+
+
+pairs = st.lists(st.tuples(st.sampled_from("abcdefghijxy"), st.sampled_from("abcdefghijxy")))
+
+
+@given(term_sets, pairs, st.integers(1, 100))
+def test_dictionary_injection_keeps_m_a_probability(
+    chunks: list[set[str]], dictionary: list[tuple[str, str]], w: int
+) -> None:
+    model = build_model(
+        chunks, ModelParams(stop_words=None, dictionary_weight=w), dictionary=dictionary
+    )
+    v = model.vocab
+    added = {frozenset(p) for p in dictionary if p[0] != p[1] and p[0] in v and p[1] in v}
+    assert model.dictionary_pairs == len(added)
+    expected = np.zeros((len(v), len(v)), dtype=np.int64)
+    for chunk, copies in [(c, 1) for c in chunks] + [(p, w) for p in added]:
+        for a in chunk:
+            for b in chunk:
+                expected[v.id(a), v.id(b)] += copies
+    np.testing.assert_array_equal(model.c.toarray(), expected)
+    m = standardized(model.c).toarray()
+    assert (m <= 1).all() and (m >= 0).all()
+    np.testing.assert_allclose(model.s.sum(axis=1)[model.rowsum_m > 0], 1.0)

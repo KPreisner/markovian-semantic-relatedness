@@ -12,7 +12,11 @@ from msr.search.corpus import CorpusConfig
 
 
 def test_model_params_serialize_rules_as_specs() -> None:
-    assert ModelParams().model_dump(mode="json") == {"stop_words": "top:100", "truncation": 1000}
+    assert ModelParams().model_dump(mode="json") == {
+        "stop_words": "top:100",
+        "truncation": 1000,
+        "dictionary_weight": 100,
+    }
     assert ModelParams(stop_words=None).model_dump(mode="json")["stop_words"] == "none"
 
 

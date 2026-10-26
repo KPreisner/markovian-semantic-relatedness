@@ -34,12 +34,20 @@ def incidence_matrix(term_sets: Iterable[Collection[str]], vocab: Vocab) -> sp.c
     )
 
 
-def cooccurrence(b: sp.csr_array) -> sp.csr_array:
+def cooccurrence(
+    b: sp.csr_array, dictionary: sp.csr_array | None = None, weight: int = 1
+) -> sp.csr_array:
     """C = BᵀB: `C[i, j]` counts chunks containing both i and j; `C[i, i]` counts chunks with i.
 
-    Every vocab term must appear in at least one chunk (`C[i, i] >= 1`).
+    With `dictionary` (the incidence matrix of the dictionary chunks), C = BᵀB + w·DᵀD, as if each
+    dictionary chunk appeared `weight` times. Every vocab term must appear in at least one chunk
+    (`C[i, i] >= 1`).
     """
     c = sp.csr_array(b.T @ b)
+    if dictionary is not None and dictionary.shape[0]:
+        if b.shape[0] + weight * dictionary.shape[0] > _MAX_CHUNKS:
+            raise ValueError("chunk and dictionary counts overflow int32")
+        c = sp.csr_array(c + weight * (dictionary.T @ dictionary))
     c.sort_indices()
     if (c.diagonal() < 1).any():
         raise ValueError("every vocab term must appear in at least one chunk")
