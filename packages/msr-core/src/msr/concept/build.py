@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import BaseModel, ConfigDict, Field
 
 from msr.concept.ranking import rank_terms, scale
 from msr.concept.zscore import negated_z, trim_count, trimmed_stats
@@ -13,14 +14,18 @@ from msr.walk.backend import Progress, WalkBackend
 from msr.walk.hitting import hitting_times
 
 
-@dataclass(frozen=True)
-class ConceptParams:
-    steps: int = 1000
-    q: int = 50
-    trim_ratio: float = 0.2
-    threshold: float = 6.0
-    root_weight: float = 100.0
-    stored_terms: int = 5000
+class ConceptParams(BaseModel):
+    """Concept parameters. Validated on construction and serialized for params.json and the cache
+    key, so the API, the worker, and the CLI share one definition."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True, allow_inf_nan=False)
+
+    steps: int = Field(1000, ge=1, description="λ: walk steps, no early stop")
+    q: int = Field(50, ge=1, description="Reference columns used per concept")
+    trim_ratio: float = Field(0.2, ge=0, lt=1, description="R: p = ⌈R·Q⌉ entries trimmed per row")
+    threshold: float = Field(6.0, description="Minimum unscaled z kept in the concept")
+    root_weight: float = Field(100.0, gt=0, description="a: the root's weight after scaling")
+    stored_terms: int = Field(5000, ge=1, description="Ranked terms stored per concept")
 
 
 @dataclass(frozen=True, eq=False)

@@ -1,23 +1,27 @@
 """The in-memory model build: term sets → df → stop words → vocab → C → M → S → T → components."""
 
 from collections.abc import Callable, Collection, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import scipy.sparse as sp
 from numpy.typing import NDArray
+from pydantic import BaseModel, ConfigDict, Field
 
 from msr.model.components import component_labels
 from msr.model.cooccur import cooccurrence, incidence_matrix
-from msr.model.stopwords import StopWordRule, TopK, select_stop_words
+from msr.model.stopwords import StopWordSpec, TopK, select_stop_words
 from msr.model.transition import row_sums, standardized, transition, truncated
 from msr.model.vocab import Vocab, count_df
 
 
-@dataclass(frozen=True)
-class ModelParams:
-    stop_words: StopWordRule | None = field(default_factory=lambda: TopK(100))
-    truncation: int = 1000
+class ModelParams(BaseModel):
+    """Model build parameters, recorded in the model's manifest."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    stop_words: StopWordSpec = Field(TopK(100), description="Stop-word rule, e.g. top:100 or none")
+    truncation: int = Field(1000, ge=1, description="t: entries kept per row of T (Definition 1)")
 
 
 @dataclass(frozen=True, eq=False)

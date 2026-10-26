@@ -29,7 +29,7 @@ def test_s_and_t_rows_sum_to_one(chunks: list[set[str]], t: int) -> None:
 @given(term_sets, st.integers(0, 4))
 def test_prefiltered_c_equals_full_c_minus_stop_words(chunks: list[set[str]], k: int) -> None:
     full = build_model(chunks, NO_STOPS)
-    filtered = build_model(chunks, ModelParams(TopK(k)))
+    filtered = build_model(chunks, ModelParams(stop_words=TopK(k)))
     keep = [full.vocab.id(t) for t in filtered.vocab]
     np.testing.assert_array_equal(filtered.c.toarray(), full.c.toarray()[np.ix_(keep, keep)])
 

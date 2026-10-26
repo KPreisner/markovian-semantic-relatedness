@@ -9,6 +9,9 @@ import math
 from collections import defaultdict
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
+from typing import Annotated
+
+from pydantic import BeforeValidator, PlainSerializer
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,18 @@ def parse_rule(spec: str) -> StopWordRule | None:
         case "maxdf", _ if arg:
             return MaxDF(float(arg))
     raise ValueError(f"unknown stop-word rule {spec!r}; expected top:K, maxdf:F, knee, or none")
+
+
+def _parse_if_spec(value: object) -> object:
+    return parse_rule(value) if isinstance(value, str) else value
+
+
+type StopWordSpec = Annotated[
+    StopWordRule | None,
+    BeforeValidator(_parse_if_spec),
+    PlainSerializer(lambda rule: str(rule) if rule is not None else "none", return_type=str),
+]
+"""A rule in a pydantic model: accepts a rule or its spec string, serializes as the spec."""
 
 
 def ranked_by_df(df: Mapping[str, int]) -> list[str]:

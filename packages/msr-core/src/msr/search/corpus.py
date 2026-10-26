@@ -16,16 +16,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import orjson
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 CONFIG_FILE = "corpus.json"
 FORMATS = (".txt", ".jsonl", ".json")
 COMPRESSIONS = ("", ".gz", ".zst")
 
 
-@dataclass(frozen=True)
-class CorpusConfig:
-    text_field: str = "text"
-    id_field: str = "id"
+class CorpusConfig(BaseModel):
+    """The optional `corpus.json`. Unknown keys are rejected, so a typo can't silently fall back to
+    a default field name."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+
+    text_field: str = Field("text", min_length=1)
+    id_field: str = Field("id", min_length=1)
     description: str = ""
 
     @classmethod
@@ -33,8 +38,10 @@ class CorpusConfig:
         path = root / CONFIG_FILE
         if not path.exists():
             return cls()
-        raw = orjson.loads(path.read_bytes())
-        return cls(**{k: raw[k] for k in ("text_field", "id_field", "description") if k in raw})
+        try:
+            return cls.model_validate_json(path.read_bytes())
+        except ValidationError as e:
+            raise ValueError(f"invalid {path}: {e}") from e
 
 
 @dataclass(frozen=True)
