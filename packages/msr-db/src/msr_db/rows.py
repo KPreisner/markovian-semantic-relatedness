@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 
 @dataclass(frozen=True)
@@ -39,3 +40,85 @@ class CorpusRow:
     byte_count: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ConceptRow:
+    concept_id: UUID
+    model_id: str
+    root_idx: int
+    params: dict[str, Any]
+    params_hash: str
+    term_idx: list[int]
+    weight: list[float]
+    cooccur: list[int]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ConceptSummaryRow:
+    """A cached concept without its ranked arrays."""
+
+    concept_id: UUID
+    params: dict[str, Any]
+    params_hash: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ConceptTermRow:
+    """One ranked concept term, joined with its vocab entry."""
+
+    rank: int
+    term_idx: int
+    term: str
+    term_count: int
+    weight: float
+    cooccur: int
+
+
+@dataclass(frozen=True)
+class JobRow:
+    job_id: UUID
+    job_type: str
+    status: str
+    model_id: str
+    root_idx: int | None
+    params_hash: str | None
+    params: dict[str, Any]
+    progress: dict[str, Any] | None
+    result_id: UUID | None
+    error_code: str | None
+    error_message: str | None
+    attempts: int
+    task_id: str | None
+    worker_id: str | None
+    warnings: list[str]
+    correlation_id: UUID | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+@dataclass(frozen=True)
+class SearchRow:
+    search_id: UUID
+    model_id: str
+    corpus_id: str
+    concept_ids: list[UUID]
+    params: dict[str, Any]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class SearchHitRow:
+    hit_rank: int
+    doc_id: str
+    file_path: str
+    doc_offset: int
+    chunk_index: int
+    chunk_text: str
+    matches: list[dict[str, Any]]
+    """[{term, start, end}] spans within chunk_text."""
+    concept_scores: list[float]
+    score: float

@@ -1,13 +1,14 @@
-"""The registries: models, their vocab, and corpora (written by the builder).
+"""The registries: models, their vocab, and corpora (written by the builder, read by the API).
 
 Repositories wrap a connection and leave transactions to the caller, so a model and its vocab can
-be registered atomically.
+be registered atomically. Each statement is a module constant shared by the sync classes (builder,
+worker) and their `Async` twins (API), so the two can't drift apart.
 """
 
 from collections.abc import Iterable
 from typing import Any
 
-from psycopg import Connection
+from psycopg import AsyncConnection, Connection
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
@@ -15,6 +16,26 @@ from msr_db.rows import CorpusRow, ModelRow, VocabRow
 
 type VocabTuple = tuple[int, str, int, str | None]
 """(term_idx, term, term_count, language), in `COPY` column order."""
+
+
+MODEL_GET = "SELECT * FROM msr.models WHERE model_id = %s"
+MODEL_ALL = "SELECT * FROM msr.models ORDER BY created_at, model_id"
+VOCAB_LOOKUP = """
+    SELECT term_idx, term, term_count, language FROM msr.vocab
+    WHERE model_id = %s AND term = %s
+"""
+VOCAB_GET = """
+    SELECT term_idx, term, term_count, language FROM msr.vocab
+    WHERE model_id = %s AND term_idx = %s
+"""
+VOCAB_PREFIX = """
+    SELECT term_idx, term, term_count, language FROM msr.vocab
+    WHERE model_id = %s AND term LIKE %s
+    ORDER BY term_count DESC, term
+    LIMIT %s
+"""
+CORPUS_GET = "SELECT * FROM msr.corpora WHERE corpus_id = %s"
+CORPUS_ALL = "SELECT * FROM msr.corpora ORDER BY corpus_id"
 
 
 def like_prefix(prefix: str) -> str:
@@ -30,12 +51,12 @@ class ModelRepository:
     def get(self, model_id: str, *, for_update: bool = False) -> ModelRow | None:
         lock = " FOR UPDATE" if for_update else ""
         with self.conn.cursor(row_factory=class_row(ModelRow)) as cur:
-            cur.execute(f"SELECT * FROM msr.models WHERE model_id = %s{lock}", (model_id,))
+            cur.execute(MODEL_GET + lock, (model_id,))
             return cur.fetchone()
 
     def all(self) -> list[ModelRow]:
         with self.conn.cursor(row_factory=class_row(ModelRow)) as cur:
-            cur.execute("SELECT * FROM msr.models ORDER BY created_at, model_id")
+            cur.execute(MODEL_ALL)
             return cur.fetchall()
 
     def insert(
@@ -115,27 +136,13 @@ class VocabRepository:
     def lookup(self, model_id: str, term: str) -> VocabRow | None:
         """The term with exactly this spelling (case-sensitive, as in the model)."""
         with self.conn.cursor(row_factory=class_row(VocabRow)) as cur:
-            cur.execute(
-                """
-                SELECT term_idx, term, term_count, language FROM msr.vocab
-                WHERE model_id = %s AND term = %s
-                """,
-                (model_id, term),
-            )
+            cur.execute(VOCAB_LOOKUP, (model_id, term))
             return cur.fetchone()
 
     def prefix(self, model_id: str, prefix: str, *, limit: int = 20) -> list[VocabRow]:
         """Terms starting with `prefix` (case-sensitive), most frequent first."""
         with self.conn.cursor(row_factory=class_row(VocabRow)) as cur:
-            cur.execute(
-                """
-                SELECT term_idx, term, term_count, language FROM msr.vocab
-                WHERE model_id = %s AND term LIKE %s
-                ORDER BY term_count DESC, term
-                LIMIT %s
-                """,
-                (model_id, like_prefix(prefix), limit),
-            )
+            cur.execute(VOCAB_PREFIX, (model_id, like_prefix(prefix), limit))
             return cur.fetchall()
 
 
@@ -145,12 +152,12 @@ class CorpusRepository:
 
     def get(self, corpus_id: str) -> CorpusRow | None:
         with self.conn.cursor(row_factory=class_row(CorpusRow)) as cur:
-            cur.execute("SELECT * FROM msr.corpora WHERE corpus_id = %s", (corpus_id,))
+            cur.execute(CORPUS_GET, (corpus_id,))
             return cur.fetchone()
 
     def all(self) -> list[CorpusRow]:
         with self.conn.cursor(row_factory=class_row(CorpusRow)) as cur:
-            cur.execute("SELECT * FROM msr.corpora ORDER BY corpus_id")
+            cur.execute(CORPUS_ALL)
             return cur.fetchall()
 
     def upsert(
@@ -187,3 +194,53 @@ class CorpusRepository:
     def delete(self, corpus_id: str) -> bool:
         cur = self.conn.execute("DELETE FROM msr.corpora WHERE corpus_id = %s", (corpus_id,))
         return cur.rowcount > 0
+
+
+class AsyncModelRepository:
+    def __init__(self, conn: AsyncConnection[Any]) -> None:
+        self.conn = conn
+
+    async def get(self, model_id: str) -> ModelRow | None:
+        async with self.conn.cursor(row_factory=class_row(ModelRow)) as cur:
+            await cur.execute(MODEL_GET, (model_id,))
+            return await cur.fetchone()
+
+    async def all(self) -> list[ModelRow]:
+        async with self.conn.cursor(row_factory=class_row(ModelRow)) as cur:
+            await cur.execute(MODEL_ALL)
+            return await cur.fetchall()
+
+
+class AsyncVocabRepository:
+    def __init__(self, conn: AsyncConnection[Any]) -> None:
+        self.conn = conn
+
+    async def get(self, model_id: str, term_idx: int) -> VocabRow | None:
+        async with self.conn.cursor(row_factory=class_row(VocabRow)) as cur:
+            await cur.execute(VOCAB_GET, (model_id, term_idx))
+            return await cur.fetchone()
+
+    async def lookup(self, model_id: str, term: str) -> VocabRow | None:
+        async with self.conn.cursor(row_factory=class_row(VocabRow)) as cur:
+            await cur.execute(VOCAB_LOOKUP, (model_id, term))
+            return await cur.fetchone()
+
+    async def prefix(self, model_id: str, prefix: str, *, limit: int = 20) -> list[VocabRow]:
+        async with self.conn.cursor(row_factory=class_row(VocabRow)) as cur:
+            await cur.execute(VOCAB_PREFIX, (model_id, like_prefix(prefix), limit))
+            return await cur.fetchall()
+
+
+class AsyncCorpusRepository:
+    def __init__(self, conn: AsyncConnection[Any]) -> None:
+        self.conn = conn
+
+    async def get(self, corpus_id: str) -> CorpusRow | None:
+        async with self.conn.cursor(row_factory=class_row(CorpusRow)) as cur:
+            await cur.execute(CORPUS_GET, (corpus_id,))
+            return await cur.fetchone()
+
+    async def all(self) -> list[CorpusRow]:
+        async with self.conn.cursor(row_factory=class_row(CorpusRow)) as cur:
+            await cur.execute(CORPUS_ALL)
+            return await cur.fetchall()

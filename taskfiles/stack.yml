@@ -55,8 +55,8 @@ tasks:
     dir: "{{.ROOT_DIR}}"
     prompt: This deletes the Postgres, RabbitMQ, and Redis volumes and the msr images. Continue?
     cmds:
-      - docker compose --profile build down --volumes --rmi local --remove-orphans
-      - docker image rm -f msr-builder:develop
+      - docker compose --profile build --profile test down --volumes --rmi local --remove-orphans
+      - docker image rm -f msr-builder:develop msr-api:develop
 
   logs:
     desc: "Show logs (e.g. -- postgres)"
