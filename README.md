@@ -56,8 +56,8 @@ task check                # lint, typecheck, and test (py:check); task py-lint i
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
 
-The stack (Postgres, RabbitMQ, and Redis so far) runs in Docker Compose. Nothing is published to
-the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
+The stack (the API, Postgres, RabbitMQ, and Redis so far) runs in Docker Compose. Nothing is
+published to the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
 secrets and local overrides).
 
 ```bash
@@ -79,6 +79,22 @@ it needs. The SQL migrations in `database/migration/` are the schema (no ORM): `
 bootstraps the database and roles on every start, and each file in `002_migration/` runs once.
 An applied file never changes; a fix is a new file.
 
+The API (FastAPI) is internal to the stack. To work on it, `task dev:up:api` runs it from source
+with hot reload and publishes it on `127.0.0.1:8000` only, with Swagger UI at
+<http://127.0.0.1:8000/docs>; `task up` returns to the unpublished default.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Postgres and Redis are reachable |
+| `GET /models`, `GET /models/{id}` | registered models with their provenance |
+| `GET /models/{id}/terms?prefix=` | autocomplete, most frequent first (case-sensitive) |
+| `POST /models/{id}/concepts` | `{root, …params}` → `200 ready` (cached) or `202 pending` with a job id |
+| `GET /models/{id}/concepts?root=` | cached concepts for a root, without starting a job |
+| `GET /concepts/{id}` | the ranked concept table |
+| `GET /corpora` | registered corpora |
+| `POST /searches`, `GET /searches/{id}` | search with concepts; its job and ranked hits |
+| `GET /jobs/{id}`, `GET /jobs/{id}/events` | a job's status, and its progress as Server-Sent Events |
+
 Builder commands (see Building the Simple English model). Each runs `msr` in the builder
 container, and its `-native` twin runs the same command with uv; the arguments are the same.
 
@@ -89,6 +105,7 @@ task build:corpus         # msr corpus: raw data → a search corpus (build:corp
 task build:register -- model <id>   # register a built model (or: -- corpus <name>) in Postgres
 task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
 task dev:up               # start the stack with every compose-overrides/ dev override applied
+task dev:up:api           # just the API from source, hot reload, on 127.0.0.1:8000
 ```
 
 Personal tasks go in `taskfiles/udt.yml` (gitignored; start from `taskfiles/udt.sample.yml`) and

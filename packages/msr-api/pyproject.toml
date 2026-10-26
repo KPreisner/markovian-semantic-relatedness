@@ -5,7 +5,16 @@ description = "MSR FastAPI service (REST + SSE)."
 license = "LicenseRef-PolyForm-Strict-1.0.0"
 authors = [{ name = "Karl Preisner" }]
 requires-python = ">=3.14"
-dependencies = ["msr-core", "msr-db"]
+dependencies = [
+    "celery>=5.6.3",
+    "fastapi>=0.162.0",
+    "msr-core",
+    "msr-db",
+    "redis>=8.1.0",
+    "sse-starlette>=3.6.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
 
 [tool.uv.sources]
 msr-core = { workspace = true }

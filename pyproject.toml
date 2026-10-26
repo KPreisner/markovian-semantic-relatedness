@@ -17,6 +17,8 @@ dev = [
     "hypothesis>=6.170",
     "scipy-stubs>=1.18",
     "pyarrow-stubs>=20.0",
+    "httpx>=0.28.1",
+    "celery-types>=0.26.0",
 ]
 
 [tool.uv]

@@ -63,15 +63,53 @@ services:
       timeout: 2s
       retries: 30
 
+  # FastAPI (REST + SSE). Stateless: no data/ mount, only Postgres, Redis, and the broker.
+  api:
+    image: msr-api:latest
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+      target: final
+      args: {MEMBER: msr-api}
+    <<: *env-files
+    command:
+      - uvicorn
+      - --factory
+      - msr_api.main:create_app
+      - --host=0.0.0.0
+      - --port=8000
+      - --no-access-log
+      - --timeout-graceful-shutdown=15
+    networks: [backend]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   # Run-and-exit: `task build:<stage> -- …` runs `docker compose run --rm builder msr …`.
   builder:
     image: msr-builder:latest
     build:
       context: .
-      dockerfile: docker/builder.Dockerfile
+      dockerfile: docker/python.Dockerfile
       target: final
+      args: {MEMBER: msr-build}
     profiles: [build]
     <<: *env-files
+    command: ["msr", "--help"]
     environment:
       MSR_DATA_DIR: /data
     volumes:
@@ -81,15 +119,15 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # Integration tests (`task py:test:integration`): the builder's develop image with the source,
-  # tests, and migrations mounted, on the backend network where Postgres is reachable. The tests
-  # create and drop their own scratch databases.
+  # Integration tests (`task py:test:integration`): the whole workspace with the source, tests,
+  # and migrations mounted, on the backend network where Postgres, Redis, and RabbitMQ are
+  # reachable. The tests create and drop their own scratch databases and queues.
   test:
-    image: msr-builder:develop
+    image: msr-test:latest
     build:
       context: .
-      dockerfile: docker/builder.Dockerfile
-      target: develop
+      dockerfile: docker/python.Dockerfile
+      target: test
     profiles: [test]
     <<: *env-files
     environment:
@@ -104,6 +142,10 @@ services:
     networks: [backend]
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
 volumes:
