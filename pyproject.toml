@@ -34,6 +34,8 @@ src = ["packages/*/src", "."]
 [tool.ruff.lint]
 # E/W pycodestyle, F pyflakes, I isort, B bugbear, UP pyupgrade, SIM simplify, N naming, RUF ruff-specific
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "RUF"]
+# Ambiguous-Unicode checks: the math uses ×, −, – as in the paper, and the data is bilingual.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.14"

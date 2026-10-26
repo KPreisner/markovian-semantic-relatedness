@@ -30,9 +30,9 @@ package per deployable part, so each container installs only what it needs.
 
 | Package | Import | Role |
 |---|---|---|
-| `packages/msr-core` | `msr` | The algorithm: co-occurrence model, Markov walk, concepts, corpus search |
-| `packages/msr-nlp` | `msr_nlp` | spaCy pipelines, term sets, stop words, dataset readers |
-| `packages/msr-db` | `msr_db` | SQLAlchemy models and Alembic migrations |
+| `packages/msr-core` | `msr` | The algorithm: stop-word rules, co-occurrence model, Markov walk, concepts, corpus search |
+| `packages/msr-nlp` | `msr_nlp` | spaCy pipelines, term sets, dataset readers |
+| `packages/msr-db` | `msr_db` | psycopg 3 pool and raw-SQL repositories |
 | `packages/msr-api` | `msr_api` | FastAPI service (REST + SSE) |
 | `packages/msr-worker` | `msr_worker` | Celery worker for concept and search jobs |
 | `packages/msr-build` | `msr_build` | The `msr` CLI: model builds and corpus prep (run-and-exit container) |
