@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import type { ConceptRequest, ConceptStatus, ConceptSummary, ModelSummary } from "@/lib/api";
 import { api, ApiRequestError } from "@/lib/client/api";
-import { useRecentConcepts } from "@/lib/client/recent";
+import { clearRecent, pruneMissing, useRecentConcepts } from "@/lib/client/recent";
 import { formatCount, paramsLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +42,7 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
   const [error, setError] = useState<string | null>(null);
   const [found, setFound] = useState<{ key: string; concepts: ConceptSummary[] } | null>(null);
   const recent = useRecentConcepts();
+  useEffect(() => void pruneMissing(), []);
 
   // Concepts already cached for this root (any parameters): reachable without building. The
   // result is kept with its model and term, so a stale answer never shows for another term.
@@ -261,12 +262,23 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
       </div>
 
       <aside aria-labelledby="recent-heading" className="flex flex-col gap-3">
-        <h2
-          id="recent-heading"
-          className="font-sans text-sm font-semibold tracking-widest text-muted-foreground uppercase"
-        >
-          Recent concepts
-        </h2>
+        <div className="flex items-baseline justify-between">
+          <h2
+            id="recent-heading"
+            className="font-sans text-sm font-semibold tracking-widest text-muted-foreground uppercase"
+          >
+            Recent concepts
+          </h2>
+          {recent.length > 0 && (
+            <button
+              type="button"
+              onClick={() => clearRecent()}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">Concepts you open show up here.</p>
         ) : (

@@ -121,3 +121,15 @@ describe("recent concepts", () => {
     expect(readRecent(undefined)).toEqual([]);
   });
 });
+
+describe("forgetting recent concepts", () => {
+  it("drops the given ids and can clear everything", async () => {
+    const { clearRecent, forgetConcepts } = await import("@/lib/client/recent");
+    const storage = new MemoryStorage();
+    for (const id of ["a", "b", "c"])
+      rememberConcept({ concept_id: id, model_id: "m", root: id }, storage);
+    expect(forgetConcepts(["b"], storage).map((c) => c.concept_id)).toEqual(["c", "a"]);
+    expect(clearRecent(storage)).toEqual([]);
+    expect(readRecent(storage)).toEqual([]);
+  });
+});

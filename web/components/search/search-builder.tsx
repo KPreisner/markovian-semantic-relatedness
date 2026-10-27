@@ -18,7 +18,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import type { ConceptStatus, Corpus, ModelSummary, SearchStarted } from "@/lib/api";
 import { api, ApiRequestError } from "@/lib/client/api";
-import { useRecentConcepts } from "@/lib/client/recent";
+import { pruneMissing, useRecentConcepts } from "@/lib/client/recent";
 import { useJobEvents } from "@/lib/client/use-job-events";
 import { formatBytes, formatCount } from "@/lib/format";
 import { conceptColor } from "@/lib/highlight";
@@ -55,6 +55,7 @@ export function SearchBuilder({
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const recent = useRecentConcepts();
+  useEffect(() => void pruneMissing(), []);
 
   // Every concept of a search comes from one model; the first chip decides it.
   const lockedModel = chips[0]?.model_id;

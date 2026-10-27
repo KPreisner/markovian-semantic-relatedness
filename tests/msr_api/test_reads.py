@@ -1,11 +1,14 @@
 """Health, models, terms, corpora, error shape, and the correlation id."""
 
+from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
 import httpx
+import psycopg
 import pytest
 
-from tests.fixtures.api import CORPUS_ID, MODEL_ID, STEPS
+from tests.fixtures.api import CORPUS_ID, MODEL_ID, STEPS, RunningApi
+from tests.fixtures.database import superuser_conninfo
 
 pytestmark = pytest.mark.integration
 
@@ -72,3 +75,22 @@ def test_a_correlation_id_is_generated_or_kept(client: httpx.Client) -> None:
     assert response.headers["X-Correlation-ID"] == mine
     bad = client.get("/health/live", headers={"X-Correlation-ID": "not-a-uuid"})
     assert UUID(bad.headers["X-Correlation-ID"]).version == 7
+
+
+def test_requests_survive_postgres_dropping_the_pools_connections(
+    client: httpx.Client, api: RunningApi
+) -> None:
+    """As after a Postgres restart (task db:reset): the pool's connections are all dead. Each is
+    checked before it's lent, and the first failure sweeps the pool, so no request fails."""
+    # A burst fills the pool to its maximum: after a restart every one of them is dead, which a
+    # one-at-a-time check (with backoff) would take longer than a request's timeout to get past.
+    with ThreadPoolExecutor(12) as burst:
+        list(burst.map(lambda _: client.get("/health/live") and client.get("/models"), range(24)))
+    with psycopg.connect(superuser_conninfo(api.database), autocommit=True) as conn:
+        killed = conn.execute(
+            "SELECT count(*) FILTER (WHERE pg_terminate_backend(pid)) FROM pg_stat_activity "
+            "WHERE datname = %s AND usename = %s",
+            (api.database.name, api.database.user("api")),
+        ).fetchone()
+    assert killed is not None and killed[0] >= 1
+    assert [client.get("/models").status_code for _ in range(5)] == [200] * 5

@@ -58,6 +58,20 @@ TAGS = [
 ]
 
 
+async def check_or_sweep(
+    pool: AsyncConnectionPool[AsyncConnection[Any]], conn: AsyncConnection[Any]
+) -> None:
+    """Check a connection before the pool lends it. After Postgres restarts (e.g. task db:reset)
+    every idle connection is dead; the pool would check them one at a time with a growing backoff
+    (1 s, 2 s, 4 s…) and time out. So the first failure sweeps the pool, dropping every broken
+    connection, and the retry gets a fresh one."""
+    try:
+        await AsyncConnectionPool.check_connection(conn)
+    except Exception:
+        await pool.check()
+        raise
+
+
 def openapi_schema(app: FastAPI) -> dict[str, Any]:
     """FastAPI's schema, with each event stream's `model` documented where it belongs. FastAPI
     files a `responses` model under `application/json`; an `EventSourceResponse` route never
@@ -101,6 +115,7 @@ def create_app(
             db.conninfo("api"),
             min_size=settings.db_pool_min,
             max_size=settings.db_pool_max,
+            check=lambda conn: check_or_sweep(pool, conn),
             open=False,
         )
         await pool.open(wait=True, timeout=30)

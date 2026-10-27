@@ -29,17 +29,61 @@ export function rememberConcept(
   storage: Storage | undefined = safeStorage(),
   now: Date = new Date(),
 ): RecentConcept[] {
-  const next = [
-    { ...concept, opened_at: now.toISOString() },
-    ...readRecent(storage).filter((c) => c.concept_id !== concept.concept_id),
-  ].slice(0, LIMIT);
+  return write(
+    [
+      { ...concept, opened_at: now.toISOString() },
+      ...readRecent(storage).filter((c) => c.concept_id !== concept.concept_id),
+    ].slice(0, LIMIT),
+    storage,
+  );
+}
+
+/** Drop concepts that no longer exist (the database was reset, or their model deleted). The list
+ * lives in this browser, so nothing on the server can clear it. */
+export function forgetConcepts(
+  ids: readonly string[],
+  storage: Storage | undefined = safeStorage(),
+): RecentConcept[] {
+  return write(
+    readRecent(storage).filter((c) => !ids.includes(c.concept_id)),
+    storage,
+  );
+}
+
+export function clearRecent(storage: Storage | undefined = safeStorage()): RecentConcept[] {
+  return write([], storage);
+}
+
+function write(list: RecentConcept[], storage: Storage | undefined): RecentConcept[] {
   try {
-    storage?.setItem(KEY, JSON.stringify(next));
+    storage?.setItem(KEY, JSON.stringify(list));
   } catch {
     // Full or blocked storage: the list just isn't remembered.
   }
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CHANGED));
-  return next;
+  return list;
+}
+
+let pruned = false;
+
+/** Once per page load, check the remembered concepts still exist and forget the ones that
+ * don't. At most `LIMIT` small requests (`limit=1`). */
+export async function pruneMissing(fetcher: typeof fetch = fetch): Promise<string[]> {
+  if (pruned) return [];
+  pruned = true;
+  const checks = await Promise.all(
+    readRecent().map(async (c) => {
+      try {
+        const response = await fetcher(`/api/concepts/${encodeURIComponent(c.concept_id)}?limit=1`);
+        return response.status === 404 ? c.concept_id : null;
+      } catch {
+        return null; // unreachable is not missing
+      }
+    }),
+  );
+  const missing = checks.filter((id): id is string => id !== null);
+  if (missing.length) forgetConcepts(missing);
+  return missing;
 }
 
 const CHANGED = "msr:recent-changed";
