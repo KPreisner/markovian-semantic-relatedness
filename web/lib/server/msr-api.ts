@@ -21,7 +21,8 @@ const RETRY_STATUSES = new Set([502, 503, 504]);
 const GET_ATTEMPTS = 3;
 const BACKOFF_MS = 200;
 
-type Query = Record<string, string | number | undefined | null>;
+/** Query parameters; an array is sent as the parameter repeated (`?status=a&status=b`). */
+export type Query = Record<string, string | number | readonly string[] | undefined | null>;
 
 export type ApiCall<S extends z.ZodType> = {
   path: string;
@@ -42,7 +43,9 @@ export type ApiResult<T> = { status: number; data: T };
 export function apiUrl(path: string, query?: Query): URL {
   const url = new URL(path.replace(/^\//, ""), config().MSR_API_URL.replace(/\/?$/, "/"));
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null && value !== "") {
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(key, item);
+    } else if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));
     }
   }

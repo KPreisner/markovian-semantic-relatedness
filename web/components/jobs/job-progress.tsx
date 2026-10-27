@@ -30,7 +30,7 @@ const LABEL: Record<LiveStatus, string> = {
   failed: "Failed",
 };
 
-export function StatusBadge({ status }: { status: LiveStatus }) {
+export function StatusBadge({ status, label }: { status: LiveStatus; label?: string }) {
   return (
     <Badge
       variant="outline"
@@ -48,7 +48,7 @@ export function StatusBadge({ status }: { status: LiveStatus }) {
       ) : (
         <span className="animate-pulse-soft size-2 rounded-full bg-current" />
       )}
-      {status}
+      {label ?? status}
     </Badge>
   );
 }

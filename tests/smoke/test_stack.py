@@ -190,7 +190,12 @@ def test_the_ui_pages_render_the_results(stack: Stack) -> None:
         return response.text
 
     assert "Meaning, found by" in page("/") and MODEL_ID in page("/")
-    assert MODEL_ID in page("/workbench")
+    assert MODEL_ID in page("/concepts/new")
+    index = page("/concepts")
+    assert f"/concepts/{concept_id}" in index and ">cat<" in index
+    # The build page's old address redirects to it.
+    old = httpx.get(f"{stack.web}/workbench", timeout=60)
+    assert (old.status_code, old.headers["location"]) == (308, "/concepts/new")
     assert CORPUS_ID in page(f"/search?concepts={concept_id}")
     concept = page(f"/concepts/{concept_id}")
     assert ">cat<" in concept and "hat" in concept

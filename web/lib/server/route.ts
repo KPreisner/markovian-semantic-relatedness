@@ -78,8 +78,17 @@ export async function jsonBody<S extends z.ZodObject>(
   return parsed.data as z.infer<S>;
 }
 
-/** The given query parameters of the request, for passing on to the API. */
-export function queryOf(request: Request, ...names: string[]): Record<string, string | undefined> {
+/** The given query parameters of the request, for passing on to the API (a repeated one as an
+ * array). */
+export function queryOf(
+  request: Request,
+  ...names: string[]
+): Record<string, string | string[] | undefined> {
   const params = new URL(request.url).searchParams;
-  return Object.fromEntries(names.map((name) => [name, params.get(name) ?? undefined]));
+  return Object.fromEntries(
+    names.map((name) => {
+      const values = params.getAll(name);
+      return [name, values.length > 1 ? values : (values[0] ?? undefined)];
+    }),
+  );
 }

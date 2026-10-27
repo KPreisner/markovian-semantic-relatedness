@@ -1,9 +1,18 @@
-// The UI's pure helpers: highlight segmentation, match strength, formatting, and the recent-concepts
-// store.
+// The UI's pure helpers: highlight segmentation, match strength, the concepts index's filters,
+// formatting, and the recent-concepts store.
 import { describe, expect, it } from "vitest";
 
 import { readRecent, rememberConcept } from "@/lib/client/recent";
-import { formatBytes, formatSeconds, formatWeight, paramsLabel, percent } from "@/lib/format";
+import { apiQuery, indexHref, pageCount, parseFilters, tabCount } from "@/lib/concept-index";
+import {
+  formatBytes,
+  formatSeconds,
+  formatWeight,
+  paramsLabel,
+  percent,
+  scoringLabel,
+  usesScoringDefaults,
+} from "@/lib/format";
 import { segments } from "@/lib/highlight";
 import { strongFor, weakConcepts } from "@/lib/strength";
 
@@ -84,6 +93,54 @@ describe("match strength", () => {
   });
 });
 
+describe("concepts index filters", () => {
+  const counts = { ready: 120, queued: 1, running: 2, failed: 3 };
+
+  it("reads the URL, falling back to defaults for anything unknown", () => {
+    expect(parseFilters({})).toEqual({ tab: "all", term: "", model: "", page: 1 });
+    expect(parseFilters({ tab: "failed", term: " cat ", model: "m", page: "3" })).toEqual({
+      tab: "failed",
+      term: "cat",
+      model: "m",
+      page: 3,
+    });
+    expect(parseFilters({ tab: "bogus", page: "-2" })).toMatchObject({ tab: "all", page: 1 });
+    expect(parseFilters({ tab: ["built", "failed"], page: "x" })).toMatchObject({
+      tab: "built",
+      page: 1,
+    });
+  });
+
+  it("asks the API for the tab's statuses and the page's rows", () => {
+    const filters = { tab: "building", term: "", model: "", page: 2 } as const;
+    expect(apiQuery(filters)).toEqual({
+      status: ["queued", "running"],
+      term: undefined,
+      model: undefined,
+      limit: 50,
+      offset: 50,
+    });
+    expect(apiQuery({ ...filters, tab: "all" }).status).toBeUndefined();
+  });
+
+  it("writes the URL back without defaults", () => {
+    expect(indexHref({ tab: "all", term: "", model: "", page: 1 })).toBe("/concepts");
+    expect(indexHref({ tab: "failed", term: "Ron W", model: "", page: 2 })).toBe(
+      "/concepts?tab=failed&term=Ron+W&page=2",
+    );
+  });
+
+  it("counts each tab and its pages", () => {
+    expect(tabCount("all", counts)).toBe(126);
+    expect(tabCount("building", counts)).toBe(3);
+    expect(pageCount({ tab: "built", term: "", model: "", page: 1 }, counts)).toBe(3);
+    expect(pageCount({ tab: "failed", term: "", model: "", page: 1 }, counts)).toBe(1);
+    expect(
+      pageCount({ tab: "failed", term: "", model: "", page: 1 }, { ...counts, failed: 0 }),
+    ).toBe(1);
+  });
+});
+
 describe("formatting", () => {
   it("formats weights from the root's 100 down to tiny values", () => {
     expect([100, 70.62, 1.6, 0.034, 0.00012].map(formatWeight)).toEqual([
@@ -107,13 +164,31 @@ describe("formatting", () => {
     expect([percent(50, 100), percent(5, 0), percent(150, 100)]).toEqual([50, 0, 100]);
   });
 
-  it("labels a concept's parameters, mentioning only Q and R when changed", () => {
-    expect(
-      paramsLabel({ refs: "degree-mean", steps: 100, threshold: 6, q: 50, trim_ratio: 0.2 }),
-    ).toBe("degree-mean · λ 100 · z ≥ 6");
-    expect(paramsLabel({ refs: "random:7", steps: 20, threshold: 4, q: 30, trim_ratio: 0.1 })).toBe(
-      "random:7 · λ 20 · z ≥ 4 · Q 30 · R 0.1",
+  const defaults = {
+    refs: "degree-mean",
+    steps: 1000,
+    threshold: 6,
+    q: 50,
+    trim_ratio: 0.2,
+    stored_terms: 5000,
+    root_weight: 100,
+  };
+
+  it("labels a concept's parameters, mentioning settings other than z only when changed", () => {
+    expect(paramsLabel(defaults)).toBe("degree-mean · λ 1000 · z ≥ 6");
+    expect(paramsLabel({ ...defaults, steps: 20, threshold: 4, q: 30, trim_ratio: 0.1 })).toBe(
+      "degree-mean · λ 20 · z ≥ 4 · R 0.1 · Q 30",
     );
+  });
+
+  it("tells two concepts of one term apart by their scoring settings", () => {
+    expect(scoringLabel(defaults)).toBe("z ≥ 6");
+    expect(scoringLabel({ ...defaults, threshold: 4, trim_ratio: 0.1 })).toBe("z ≥ 4 · R 0.1");
+    expect(scoringLabel({ ...defaults, stored_terms: 1000, root_weight: 1 })).toBe(
+      "z ≥ 6 · 1,000 stored · root 1",
+    );
+    expect(usesScoringDefaults(defaults)).toBe(true);
+    expect(usesScoringDefaults({ ...defaults, trim_ratio: 0.1 })).toBe(false);
   });
 });
 

@@ -19,7 +19,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
             Rank text by <em className="text-gradient pr-1">meaning</em>
           </>
         }
-        lead="Each concept's top-weighted terms are matched as plain substrings in every chunk of the corpus, so nothing is tokenized or indexed ahead of time."
+        lead="Each concept's top-ranked terms are matched as whole words in every chunk of the raw corpus, so nothing is tokenized or indexed ahead of time."
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <Suspense fallback={<Skeleton className="h-96 rounded-3xl" />}>
@@ -58,6 +58,7 @@ async function SearchLoader({
       model_id: c.model_id,
       concept_id: c.concept_id,
       job_id: null,
+      params: c.params,
     }));
   return <SearchBuilder models={models} corpora={corpora} initial={initial} />;
 }

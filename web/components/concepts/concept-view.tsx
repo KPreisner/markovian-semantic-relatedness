@@ -25,6 +25,7 @@ export function ConceptView({ concept: initial }: { concept: Concept }) {
       concept_id: initial.concept_id,
       model_id: initial.model_id,
       root: initial.root.term,
+      params: initial.params,
     });
   }, [initial]);
 
@@ -68,7 +69,7 @@ export function ConceptView({ concept: initial }: { concept: Concept }) {
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/workbench">
+            <Link href="/concepts/new">
               <Sparkles /> Build another
             </Link>
           </Button>

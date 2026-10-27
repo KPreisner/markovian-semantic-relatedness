@@ -62,6 +62,41 @@ class ConceptSummary(Schema):
     job_id: UUID | None = Field(description="The job that built it (`GET /jobs/{job_id}`)")
 
 
+type EntryStatus = Literal["ready", "queued", "running", "failed"]
+
+
+class ConceptEntry(Schema):
+    """A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,
+    or `failed`."""
+
+    status: EntryStatus
+    concept_id: UUID | None = Field(description="Set when `ready`")
+    model_id: str
+    root: RootTerm
+    params: dict[str, Any]
+    created_at: datetime
+    term_count: int | None = Field(description="Ranked terms stored, when `ready`")
+    top_terms: list[str] = Field(description="The top-ranked terms after the root, when `ready`")
+    job: Job | None = Field(
+        description="The job building it, that failed, or that built it (null for a concept "
+        "stored without a job)"
+    )
+
+
+class ConceptIndexCounts(Schema):
+    ready: int
+    queued: int
+    running: int
+    failed: int
+
+
+class ConceptIndex(Schema):
+    entries: list[ConceptEntry] = Field(description="Newest first")
+    counts: ConceptIndexCounts = Field(
+        description="Entries with each status under the model and term filters (not `status`)"
+    )
+
+
 class Concept(Schema):
     concept_id: UUID
     model_id: str

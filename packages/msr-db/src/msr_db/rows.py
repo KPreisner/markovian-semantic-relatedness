@@ -69,6 +69,33 @@ class ConceptSummaryRow:
 
 
 @dataclass(frozen=True)
+class ConceptIndexRow:
+    """One entry of the concepts index: a stored concept, or a concept job that hasn't stored one
+    (queued, running, or failed)."""
+
+    status: str
+    """`ready` for a stored concept, else its job's status."""
+    concept_id: UUID | None
+    job_id: UUID | None
+    model_id: str
+    root_idx: int
+    root: str
+    params: dict[str, Any]
+    created_at: datetime
+    term_count: int | None
+    top_terms: list[str] | None
+    """The top-ranked terms after the root, in rank order."""
+
+
+@dataclass(frozen=True)
+class ConceptIndexCountsRow:
+    ready: int
+    queued: int
+    running: int
+    failed: int
+
+
+@dataclass(frozen=True)
 class ConceptTermRow:
     """One ranked concept term, joined with its vocab entry."""
 

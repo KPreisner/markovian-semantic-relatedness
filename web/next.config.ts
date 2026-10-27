@@ -25,7 +25,11 @@ const nextConfig: NextConfig = {
     return [{ source: "/fastapi/:path*", destination: `${apiUrl}/:path*` }];
   },
   async redirects() {
-    return [{ source: "/fastapi", destination: "/fastapi/docs", permanent: false }];
+    return [
+      { source: "/fastapi", destination: "/fastapi/docs", permanent: false },
+      // The build page's old address (Phase 6b).
+      { source: "/workbench", destination: "/concepts/new", permanent: true },
+    ];
   },
 };
 

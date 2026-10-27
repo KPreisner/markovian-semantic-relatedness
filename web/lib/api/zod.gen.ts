@@ -22,6 +22,16 @@ export const zCheck = z.object({
 });
 
 /**
+ * ConceptIndexCounts
+ */
+export const zConceptIndexCounts = z.object({
+    failed: z.int(),
+    queued: z.int(),
+    ready: z.int(),
+    running: z.int()
+});
+
+/**
  * ConceptRequest
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
@@ -78,6 +88,13 @@ export const zCorpus = z.object({
     text_field: z.string(),
     updated_at: z.iso.datetime({ offset: true })
 });
+
+export const zEntryStatus = z.enum([
+    'ready',
+    'queued',
+    'running',
+    'failed'
+]);
 
 /**
  * ErrorDetail
@@ -280,6 +297,32 @@ export const zConcept = z.object({
 });
 
 /**
+ * ConceptEntry
+ *
+ * A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,
+ * or `failed`.
+ */
+export const zConceptEntry = z.object({
+    concept_id: z.uuid().nullable(),
+    created_at: z.iso.datetime({ offset: true }),
+    job: zJob.nullable(),
+    model_id: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    root: zRootTerm,
+    status: zEntryStatus,
+    term_count: z.int().nullable(),
+    top_terms: z.array(z.string())
+});
+
+/**
+ * ConceptIndex
+ */
+export const zConceptIndex = z.object({
+    counts: zConceptIndexCounts,
+    entries: z.array(zConceptEntry)
+});
+
+/**
  * ConceptStatus
  *
  * `ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is
@@ -381,6 +424,19 @@ export const zHealth = z.object({
     ]),
     workers: zWorkersCheck
 });
+
+export const zListConceptsQuery = z.object({
+    model: z.string().min(1).nullish(),
+    term: z.string().min(1).max(200).nullish(),
+    status: z.array(zEntryStatus).nullish(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    offset: z.int().gte(0).optional().default(0)
+});
+
+/**
+ * Successful Response
+ */
+export const zListConceptsResponse = zConceptIndex;
 
 export const zGetConceptPath = z.object({
     concept_id: z.uuid()

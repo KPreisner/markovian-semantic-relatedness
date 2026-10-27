@@ -95,7 +95,8 @@ web is the Next.js app (`web/`), the UI at <http://127.0.0.1:3000>:
 | Page | What it does |
 |---|---|
 | `/` | what MSR is, with the paper's toy graph and the stack's models, corpora, and workers |
-| `/workbench` | pick a model, autocomplete a root term, set advanced concept parameters, build |
+| `/concepts` | every concept built, plus those still building or failed, filterable by status, model, and term; building ones update live |
+| `/concepts/new` | pick a model, autocomplete a chosen term, set advanced concept parameters, build; with what a concept is and how its weights rank a search |
 | `/jobs/{id}` | a concept job's live progress; opens the concept when it's done |
 | `/concepts/{id}` | the ranked concept table, with weights, co-occurrence, counts, and how it was built |
 | `/search` | one or more concepts of a model (building any that are missing), a corpus, and whole-word or inside-word matching |
@@ -120,6 +121,7 @@ the built image.
 | `GET /models/{id}/terms?prefix=` | autocomplete, most frequent first (case-sensitive) |
 | `POST /models/{id}/concepts` | `{root, …params}` → `200 ready` (cached) or `202 pending`, with the job that built or is building it (status, attempts, warnings, compute time) |
 | `GET /models/{id}/concepts?root=` | cached concepts for a root, without starting a job |
+| `GET /concepts` | the concepts index: stored concepts and queued, running, or failed concept jobs, newest first (`?model=`, `?term=`, `?status=`, `limit`, `offset`), with counts per status |
 | `GET /concepts/{id}` | the ranked concept table |
 | `GET /corpora` | registered corpora |
 | `POST /searches`, `GET /searches/{id}` | search with concepts; its job (status, attempts, warnings, compute time) and ranked hits |

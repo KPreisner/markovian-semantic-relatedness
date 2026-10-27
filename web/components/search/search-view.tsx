@@ -8,11 +8,16 @@ import { JobProgress, liveStatus, StatusBadge } from "@/components/jobs/job-prog
 import { Badge } from "@/components/ui/badge";
 import type { Search, SearchHit } from "@/lib/api";
 import { useJobEvents } from "@/lib/client/use-job-events";
-import { formatCount, formatScore, formatSeconds } from "@/lib/format";
+import { formatCount, formatScore, formatSeconds, scoringLabel } from "@/lib/format";
 import { conceptColor, segments } from "@/lib/highlight";
 import { weakConcepts } from "@/lib/strength";
 
-export type SearchConcept = { concept_id: string; root: string; terms: string[] };
+export type SearchConcept = {
+  concept_id: string;
+  root: string;
+  params: Record<string, unknown>;
+  terms: string[];
+};
 
 export function SearchView({ search, concepts }: { search: Search; concepts: SearchConcept[] }) {
   const router = useRouter();
@@ -48,6 +53,7 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
           >
             <span className="size-2.5 rounded-full" style={{ background: conceptColor(i) }} />
             {c.root}
+            <span className="text-xs text-muted-foreground">{scoringLabel(c.params)}</span>
           </Link>
         ))}
         <span className="text-muted-foreground">in</span>

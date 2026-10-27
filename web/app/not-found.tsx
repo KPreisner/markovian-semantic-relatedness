@@ -15,7 +15,7 @@ export default function NotFound() {
         That model, concept, search, or job doesn&apos;t exist (or no longer does).
       </p>
       <Button asChild variant="outline">
-        <Link href="/workbench">Back to the workbench</Link>
+        <Link href="/concepts">Back to the concepts</Link>
       </Button>
     </div>
   );

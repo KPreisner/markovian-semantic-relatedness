@@ -22,6 +22,7 @@ ACTIVE = ("queued", "running")
 TERMINAL = ("succeeded", "failed")
 
 JOB_GET = "SELECT * FROM msr.jobs WHERE job_id = %s"
+JOB_GET_MANY = "SELECT * FROM msr.jobs WHERE job_id = ANY(%s)"
 JOB_ACTIVE_CONCEPT = """
     SELECT * FROM msr.jobs
     WHERE model_id = %s AND root_idx = %s AND params_hash = %s
@@ -90,6 +91,12 @@ class AsyncJobRepository:
         async with self.conn.cursor(row_factory=class_row(JobRow)) as cur:
             await cur.execute(JOB_GET, (job_id,))
             return await cur.fetchone()
+
+    async def get_many(self, job_ids: list[UUID]) -> dict[UUID, JobRow]:
+        """job id → job, for the ids that exist."""
+        async with self.conn.cursor(row_factory=class_row(JobRow)) as cur:
+            await cur.execute(JOB_GET_MANY, (job_ids,))
+            return {row.job_id: row for row in await cur.fetchall()}
 
     async def insert_concept(
         self,

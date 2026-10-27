@@ -120,6 +120,91 @@ export type Concept = {
 };
 
 /**
+ * ConceptEntry
+ *
+ * A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,
+ * or `failed`.
+ */
+export type ConceptEntry = {
+    /**
+     * Concept Id
+     *
+     * Set when `ready`
+     */
+    concept_id: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * The job building it, that failed, or that built it (null for a concept stored without a job)
+     */
+    job: Job | null;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: unknown;
+    };
+    root: RootTerm;
+    status: EntryStatus;
+    /**
+     * Term Count
+     *
+     * Ranked terms stored, when `ready`
+     */
+    term_count: number | null;
+    /**
+     * Top Terms
+     *
+     * The top-ranked terms after the root, when `ready`
+     */
+    top_terms: Array<string>;
+};
+
+/**
+ * ConceptIndex
+ */
+export type ConceptIndex = {
+    /**
+     * Entries with each status under the model and term filters (not `status`)
+     */
+    counts: ConceptIndexCounts;
+    /**
+     * Entries
+     *
+     * Newest first
+     */
+    entries: Array<ConceptEntry>;
+};
+
+/**
+ * ConceptIndexCounts
+ */
+export type ConceptIndexCounts = {
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Ready
+     */
+    ready: number;
+    /**
+     * Running
+     */
+    running: number;
+};
+
+/**
  * ConceptRequest
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
@@ -306,6 +391,8 @@ export type Corpus = {
      */
     updated_at: string;
 };
+
+export type EntryStatus = 'ready' | 'queued' | 'running' | 'failed';
 
 /**
  * ErrorDetail
@@ -947,6 +1034,62 @@ export type WorkersCheck = {
      */
     status: 'ok' | 'none' | 'unknown';
 };
+
+export type ListConceptsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Model
+         *
+         * Only this model's
+         */
+        model?: string | null;
+        /**
+         * Term
+         *
+         * Roots containing this, in any case
+         */
+        term?: string | null;
+        /**
+         * Status
+         *
+         * Only these statuses
+         */
+        status?: Array<EntryStatus> | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/concepts';
+};
+
+export type ListConceptsErrors = {
+    /**
+     * No such model, term, concept, corpus, search, or job
+     */
+    404: ErrorResponse;
+    /**
+     * Invalid request or parameters
+     */
+    422: ErrorResponse;
+};
+
+export type ListConceptsError = ListConceptsErrors[keyof ListConceptsErrors];
+
+export type ListConceptsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConceptIndex;
+};
+
+export type ListConceptsResponse = ListConceptsResponses[keyof ListConceptsResponses];
 
 export type GetConceptData = {
     body?: never;

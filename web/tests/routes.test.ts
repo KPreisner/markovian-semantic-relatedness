@@ -3,6 +3,7 @@
 import { validate, version } from "uuid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { GET as concepts } from "@/app/api/concepts/route";
 import { GET as health } from "@/app/api/health/route";
 import { POST as requestConcept } from "@/app/api/models/[modelId]/concepts/route";
 import { GET as terms } from "@/app/api/models/[modelId]/terms/route";
@@ -90,6 +91,16 @@ describe("GET routes", () => {
       params({ modelId: "m" }),
     );
     expect(api.seen[0].url).toBe("/models/m/terms?prefix=trump&limit=5");
+  });
+
+  it("forwards a repeated query parameter as repeated", async () => {
+    const empty = { entries: [], counts: { ready: 0, queued: 0, running: 0, failed: 0 } };
+    api.json("GET /concepts", 200, empty);
+    const response = await concepts(
+      new Request("http://web/api/concepts?status=queued&status=running&term=cat&limit=5"),
+    );
+    expect(response.status).toBe(200);
+    expect(api.seen[0].url).toBe("/concepts?term=cat&status=queued&status=running&limit=5");
   });
 
   it("encodes path parameters", async () => {

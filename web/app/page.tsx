@@ -56,7 +56,7 @@ export default function Home() {
                 size="lg"
                 className="bg-gradient h-12 px-7 text-base text-primary-foreground shadow-[0_0_40px_var(--glow)] transition-transform hover:scale-[1.03]"
               >
-                <Link href="/workbench">Build a concept →</Link>
+                <Link href="/concepts/new">Build a concept →</Link>
               </Button>
               <Button
                 asChild
@@ -129,7 +129,7 @@ async function StackStats() {
       {tiles.map((tile) => (
         <Link
           key={tile.label}
-          href={tile.label === "workers" ? "/health" : "/workbench"}
+          href={tile.label === "workers" ? "/health" : "/concepts"}
           className="group rounded-2xl border bg-card p-5 transition-colors hover:border-primary/50"
         >
           <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">

@@ -30,6 +30,7 @@ async function SearchContent({ params }: { params: PageProps<"/searches/[searchI
       return {
         concept_id: id,
         root: concept.root.term,
+        params: concept.params,
         terms: concept.terms.filter((t) => t.weight > 0).map((t) => t.term),
       };
     }),

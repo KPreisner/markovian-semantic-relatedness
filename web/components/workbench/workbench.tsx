@@ -3,7 +3,7 @@
 import { ChevronDown, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import { TermCombobox } from "@/components/workbench/term-combobox";
 import { Badge } from "@/components/ui/badge";
@@ -21,12 +21,15 @@ import {
 import type { ConceptRequest, ConceptStatus, ConceptSummary, ModelSummary } from "@/lib/api";
 import { api, ApiRequestError } from "@/lib/client/api";
 import { clearRecent, pruneMissing, useRecentConcepts } from "@/lib/client/recent";
-import { formatCount, paramsLabel } from "@/lib/format";
+import { formatCount, paramsLabel, SCORING_DEFAULTS, scoringLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-// The concept defaults (msr.concept.build.ConceptParams); a field is sent only when changed, so
-// the API fills the rest and identical requests share a cache key.
-const DEFAULTS = { threshold: 6, trim_ratio: 0.2, stored_terms: 5000 };
+// The scoring fields the Advanced panel edits; one is sent only when changed.
+const DEFAULTS = {
+  threshold: SCORING_DEFAULTS.threshold,
+  trim_ratio: SCORING_DEFAULTS.trim_ratio,
+  stored_terms: SCORING_DEFAULTS.stored_terms,
+};
 type Advanced = typeof DEFAULTS;
 
 export function Workbench({ models }: { models: ModelSummary[] }) {
@@ -43,6 +46,10 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
   const [found, setFound] = useState<{ key: string; concepts: ConceptSummary[] } | null>(null);
   const recent = useRecentConcepts();
   useEffect(() => void pruneMissing(), []);
+
+  // Back from the concept or job page shows this page again with its state (Next keeps it
+  // alive, hidden); the form is worth keeping, a request in flight is not.
+  useLayoutEffect(() => () => setBuilding(false), []);
 
   // Concepts already cached for this root (any parameters): reachable without building. The
   // result is kept with its model and term, so a stale answer never shows for another term.
@@ -308,19 +315,23 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
               <li key={c.concept_id}>
                 <Link
                   href={`/concepts/${c.concept_id}`}
-                  className="flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-muted"
+                  className="flex flex-col rounded-lg px-2 py-1.5 hover:bg-muted"
                 >
                   <span className="truncate font-mono">{c.root}</span>
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                  <span className="truncate font-mono text-xs text-muted-foreground">
                     {c.model_id}
+                    {c.params && ` · ${scoringLabel(c.params)}`}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
         )}
+        <Link href="/concepts" className="px-2 text-sm text-muted-foreground hover:text-foreground">
+          All concepts →
+        </Link>
         <Button asChild variant="outline" className="mt-2">
-          <Link href="/search">Search with several concepts →</Link>
+          <Link href="/search">Semantically search data with concepts →</Link>
         </Button>
       </aside>
     </div>
