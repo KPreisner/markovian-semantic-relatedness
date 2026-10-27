@@ -863,6 +863,12 @@ export type SearchRequest = {
      */
     corpus: string;
     /**
+     * Match
+     *
+     * Match whole words (the default; scripts without spaces match anywhere), or substrings, so `cat` also hits `category`
+     */
+    match?: 'word' | 'substring' | null;
+    /**
      * Top K Terms
      *
      * Concept terms matched (10–1000)

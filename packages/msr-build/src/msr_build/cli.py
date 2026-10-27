@@ -25,6 +25,7 @@ from msr.model.artifacts import load_model, reference_steps
 from msr.model.build import ModelParams
 from msr.model.references import DegreeMean, Strategy, parse_strategy
 from msr.model.stopwords import parse_rule
+from msr.search.scanner import distinct_chunks
 from msr_build.paths import DataDir
 from msr_db.settings import DatabaseSettings, database_configured
 
@@ -124,6 +125,12 @@ def _parser() -> argparse.ArgumentParser:
     search.add_argument("--corpus", required=True, help="corpus name under data/corpora/")
     _concept_args(search)
     search.add_argument("--top-k", type=int, default=100, help="concept terms used (10–1000)")
+    search.add_argument(
+        "--match",
+        choices=["word", "substring"],
+        default="word",
+        help="whole words (scripts without spaces match anywhere), or substrings",
+    )
     search.add_argument("--rows", type=int, default=10, help="hits to print")
     search.add_argument("--workers", type=_workers, default=1, help="scan processes (0: all)")
 
@@ -216,6 +223,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 _concept_params(args, model_dir),
                 top_k=args.top_k,
                 workers=args.workers,
+                match=args.match,
                 log=_log,
             )
             s = result.stats
@@ -224,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"{s.bytes / seconds / 1e6:,.1f} MB/s, {s.documents / seconds:,.0f} docs/s, "
                 f"{s.chunks / seconds:,.0f} chunks/s ({seconds:.1f} s) → {out}"
             )
-            for rank, hit in enumerate(result.hits[: args.rows], start=1):
+            for rank, hit in enumerate(distinct_chunks(result.hits)[: args.rows], start=1):
                 print(f"\n{rank:>3}. {hit.score:.3f}  {hit.doc_id}  ({hit.file}@{hit.offset})")
                 print(f"     {query.highlight(hit.text, hit.matches)}")
     return 0

@@ -1,4 +1,5 @@
-"""Toy test 10: the paper's multi-concept search (Tables 4 and 5), by substring matching."""
+"""Toy test 10: the paper's multi-concept search (Tables 4 and 5). Chinese has no spaces between
+words, so whole-word matching finds a term anywhere, as substring matching does."""
 
 import orjson
 import pytest
@@ -29,7 +30,7 @@ def test_scores_reproduce(hits: dict[int, Hit], rank: int) -> None:
 
 
 def test_rank_6_also_finds_jindi_inside_jindi_xiaoxingxing(hits: dict[int, Hit]) -> None:
-    # The paper's tokenizer kept 近地小行星 whole and missed 近地; substring matching finds it.
+    # The paper's tokenizer kept 近地小行星 whole and missed 近地; matching in raw text finds it.
     assert hits[6].terms == paper.TERMS_FOUND[6] | {"近地"}
     assert round(hits[6].score, 3) == 13.825
     assert hits[6].score > paper.CHUNKS[6][0]

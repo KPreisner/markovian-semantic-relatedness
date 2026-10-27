@@ -52,6 +52,7 @@ export function SearchBuilder({
   const [corpusId, setCorpusId] = useState(corpora[0]?.corpus_id ?? "");
   const [topK, setTopK] = useState(100);
   const [topN, setTopN] = useState(100);
+  const [match, setMatch] = useState<"word" | "substring">("word");
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const recent = useRecentConcepts();
@@ -111,6 +112,7 @@ export function SearchBuilder({
           corpus: corpusId,
           top_k_terms: topK,
           top_n: topN,
+          match,
         },
       });
       router.push(`/searches/${started.search_id}`);
@@ -289,6 +291,42 @@ export function SearchBuilder({
             }
             className="tabular font-mono"
           />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label id="match-label">Match</Label>
+          <div
+            role="radiogroup"
+            aria-labelledby="match-label"
+            className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1"
+          >
+            {(
+              [
+                ["word", "Whole words"],
+                ["substring", "Inside words"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={match === value}
+                onClick={() => setMatch(value)}
+                className={cn(
+                  "rounded-md px-2 py-1 text-sm transition-colors",
+                  match === value
+                    ? "bg-card font-medium shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {match === "word"
+              ? "“cat” finds “cat’s” but not “category”. Chinese, Japanese, Thai, and other text without spaces is matched anywhere."
+              : "“cat” also finds “category” and “scat”: more hits, more noise."}
+          </p>
         </div>
         {error && (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

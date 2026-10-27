@@ -98,7 +98,7 @@ web is the Next.js app (`web/`), the UI at <http://127.0.0.1:3000>:
 | `/workbench` | pick a model, autocomplete a root term, set advanced concept parameters, build |
 | `/jobs/{id}` | a concept job's live progress; opens the concept when it's done |
 | `/concepts/{id}` | the ranked concept table, with weights, co-occurrence, counts, and how it was built |
-| `/search` | one or more concepts of a model (building any that are missing) and a corpus |
+| `/search` | one or more concepts of a model (building any that are missing), a corpus, and whole-word or inside-word matching |
 | `/searches/{id}` | the scan's live progress, then ranked paragraphs with matches colored by concept |
 | `/health` | the stack's health, refreshed every 5 s |
 
@@ -248,7 +248,10 @@ A new concept is one walk over the model: seconds for the small model, minutes f
 Concepts are cached under `data/concepts/`, so a repeat is instant. Each concept's
 directory has a `concept.tsv` with all of its ranked terms (rank, weight, co-occur, count, term),
 for reading in a spreadsheet or with `less`. Several roots in one search are
-combined with a geometric mean, so a paragraph must match all of them.
+combined with a geometric mean, so a paragraph must match all of them. Terms match as whole words
+(`cat` doesn't hit "category"), except in scripts written without spaces, such as Chinese, where
+they match anywhere; `--match substring` matches inside words everywhere. A paragraph syndicated
+in several articles is listed once.
 
 ```bash
 task msr -- concept trumpet --model simplewiki-small

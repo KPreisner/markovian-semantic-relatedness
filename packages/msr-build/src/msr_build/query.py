@@ -25,7 +25,7 @@ from msr.concept.storage import (
 )
 from msr.model.artifacts import load_references, references_dir
 from msr.model.build import Model
-from msr.search.scanner import Match, SearchResult, search, search_concept
+from msr.search.scanner import Match, MatchMode, SearchResult, search, search_concept
 
 type Log = Callable[[str], None]
 
@@ -139,6 +139,7 @@ def run_search(
     *,
     top_k: int = 100,
     workers: int = 1,
+    match: MatchMode = "word",
     log: Log = print,
 ) -> tuple[Path, SearchResult, float]:
     """Search `corpus` with one concept per root. Returns the search dir, result, and seconds."""
@@ -149,7 +150,7 @@ def run_search(
     def progress(stats: object) -> None:
         log(f"search: {stats}")
 
-    result = search(corpus, queries, top_n=None, workers=workers, progress=progress)
+    result = search(corpus, queries, top_n=None, workers=workers, match=match, progress=progress)
     seconds = time.monotonic() - start
     out = searches_root / str(uuid.uuid7())
     out.mkdir(parents=True)
@@ -158,6 +159,7 @@ def run_search(
         "corpus": corpus.name,
         "roots": list(roots),
         "top_k_terms": top_k,
+        "match": match,
         "concept_params": params.model_dump(mode="json"),
         "concept_keys": [concept_key(params)] * len(roots),
         "stats": asdict(result.stats),

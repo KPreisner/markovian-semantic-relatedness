@@ -1454,6 +1454,22 @@
             "title": "Corpus",
             "type": "string"
           },
+          "match": {
+            "anyOf": [
+              {
+                "enum": [
+                  "word",
+                  "substring"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Match whole words (the default; scripts without spaces match anywhere), or substrings, so `cat` also hits `category`",
+            "title": "Match"
+          },
           "top_k_terms": {
             "anyOf": [
               {

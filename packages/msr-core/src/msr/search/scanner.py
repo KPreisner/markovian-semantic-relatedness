@@ -1,8 +1,12 @@
 """Ranked, sub-document search with one or more concepts (§5.4).
 
-Matching is case-sensitive exact substring, with no word boundaries (`cat` hits `category`). Each
-distinct concept term counts once per chunk, and overlapping matches all count. A document's score
-is its best chunk's score.
+Matching is case-sensitive and, by default, whole-word: `cat` hits "cat" and "cat's" but not
+"category", and `muggle` doesn't hit "smuggled". A boundary is checked only on a side where the term
+itself ends in a letter or digit, and only against letters and digits of scripts that put spaces
+between words. In Chinese, Japanese, Thai and the like, and in Korean, whose particles attach to
+nouns, a term matches anywhere, as it would by substring. `match="substring"` turns the boundary
+check off everywhere. Each distinct concept term counts once per chunk, and overlapping matches all
+count. A document's score is its best chunk's score.
 
 One Aho–Corasick automaton holds every concept's terms. Each document is scanned once, and match
 positions are mapped to chunks through newline offsets only for documents with a match, so the
@@ -19,6 +23,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field, replace
 from itertools import accumulate
 from pathlib import Path
+from typing import Literal
 
 import ahocorasick
 import numpy as np
@@ -31,6 +36,40 @@ EPSILON = 1e-6
 """Added to each concept's chunk score before the geometric mean (§5.4.2)."""
 
 DEFAULT_SHARD_BYTES = 64 * 1024 * 1024
+
+type MatchMode = Literal["word", "substring"]
+
+# Scripts written without spaces between words, where a word boundary means nothing.
+_SPACELESS = (
+    (0x0E00, 0x0EFF),  # Thai, Lao
+    (0x1000, 0x109F),  # Myanmar
+    (0x1100, 0x11FF),  # Hangul Jamo
+    (0x1780, 0x17FF),  # Khmer
+    (0x3040, 0x30FF),  # Hiragana, Katakana
+    (0x3130, 0x318F),  # Hangul compatibility Jamo
+    (0x3400, 0x4DBF),  # CJK extension A
+    (0x4E00, 0x9FFF),  # CJK unified ideographs
+    (0xAC00, 0xD7AF),  # Hangul syllables
+    (0xF900, 0xFAFF),  # CJK compatibility ideographs
+    (0x20000, 0x2FA1F),  # CJK extensions B onward
+)
+
+
+def wordlike(ch: str) -> bool:
+    """A letter or digit of a script that separates words with spaces."""
+    if ch.isascii():
+        return ch.isalnum()
+    if not ch.isalnum():
+        return False
+    o = ord(ch)
+    return not any(lo <= o <= hi for lo, hi in _SPACELESS)
+
+
+def whole_word(text: str, start: int, end: int) -> bool:
+    """Whether `text[start:end]` doesn't run on into a word on either side."""
+    if wordlike(text[start]) and start > 0 and wordlike(text[start - 1]):
+        return False
+    return not (wordlike(text[end - 1]) and end < len(text) and wordlike(text[end]))
 
 
 @dataclass(frozen=True)
@@ -155,18 +194,23 @@ class _Scanner:
     pats: Patterns
     n_concepts: int
     auto: ahocorasick.Automaton
+    match: MatchMode = "word"
 
     def best_chunk(self, doc: Document) -> _Best | None:
         """The document's highest-scoring chunk (the first on ties), or None without a match."""
-        found = list(self.auto.iter(doc.text))
+        text = doc.text
+        found: list[tuple[int, str]] = []
+        for last, term in self.auto.iter(text):
+            assert isinstance(term, str)
+            start = last - len(term) + 1
+            if self.match == "substring" or whole_word(text, start, last + 1):
+                found.append((start, term))
         if not found:
             return None
-        lines = doc.text.split("\n")
+        lines = text.split("\n")
         starts = [0, *accumulate(len(line) + 1 for line in lines[:-1])]
         by_chunk: defaultdict[int, list[tuple[int, str]]] = defaultdict(list)
-        for end, term in found:
-            assert isinstance(term, str)
-            start = end - len(term) + 1
+        for start, term in found:
             by_chunk[bisect_right(starts, start) - 1].append((start, term))
         best: _Best | None = None
         for chunk, hits in sorted(by_chunk.items()):
@@ -216,9 +260,9 @@ class _Scanner:
 _worker: _Scanner | None = None
 
 
-def _init_worker(pats: Patterns, n_concepts: int) -> None:
+def _init_worker(pats: Patterns, n_concepts: int, match: MatchMode) -> None:
     global _worker
-    _worker = _Scanner(pats, n_concepts, automaton(pats))
+    _worker = _Scanner(pats, n_concepts, automaton(pats), match)
 
 
 def _scan_in_worker(
@@ -232,6 +276,18 @@ def rank_hits(hits: list[Hit], file_order: dict[str, int], top_n: int | None) ->
     return sorted(hits, key=lambda h: (-h.score, file_order[h.file], h.offset))[:top_n]
 
 
+def distinct_chunks(hits: Sequence[Hit]) -> list[Hit]:
+    """Ranked hits without repeats of a chunk's text, keeping each text's best hit. Syndicated news
+    prints the same paragraph in many articles, and the copies would otherwise fill the top."""
+    seen: set[str] = set()
+    out = []
+    for hit in hits:
+        if hit.text not in seen:
+            seen.add(hit.text)
+            out.append(hit)
+    return out
+
+
 def search(
     root: Path,
     concepts: Sequence[SearchConcept],
@@ -239,6 +295,7 @@ def search(
     top_n: int | None = 100,
     workers: int = 1,
     shard_bytes: int = DEFAULT_SHARD_BYTES,
+    match: MatchMode = "word",
     progress: Progress | None = None,
 ) -> SearchResult:
     """Score every document under `root` and return the top N (every match if None), best first.
@@ -260,12 +317,12 @@ def search(
             progress(replace(result.stats))
 
     if workers == 1:
-        scanner = _Scanner(pats, len(concepts), automaton(pats))
+        scanner = _Scanner(pats, len(concepts), automaton(pats), match)
         for shard in work:
             collect(*scanner.scan(shard, config, top_n))
     else:
         with ProcessPoolExecutor(
-            max_workers=workers, initializer=_init_worker, initargs=(pats, len(concepts))
+            max_workers=workers, initializer=_init_worker, initargs=(pats, len(concepts), match)
         ) as pool:
             futures = [pool.submit(_scan_in_worker, s, config, top_n) for s in work]
             for future in as_completed(futures):

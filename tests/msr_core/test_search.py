@@ -1,4 +1,4 @@
-"""Toy test 9: substring search over small corpora in every format."""
+"""Toy test 9: whole-word and substring search over small corpora in every format."""
 
 import gzip
 from collections.abc import Callable
@@ -12,7 +12,16 @@ import pytest
 from msr.concept.build import Concept, ConceptParams
 from msr.model.vocab import Vocab
 from msr.search.corpus import shards
-from msr.search.scanner import SearchConcept, combine, search, search_concept
+from msr.search.scanner import (
+    Hit,
+    MatchMode,
+    SearchConcept,
+    combine,
+    distinct_chunks,
+    search,
+    search_concept,
+    whole_word,
+)
 
 DOCS = [
     {"id": "a", "text": "the cat sat\nmy category is pets\nnothing here"},
@@ -61,21 +70,75 @@ def write_txt_zst(root: Path, docs: list[dict[str, str]]) -> None:
 WRITERS = [write_jsonl, write_jsonl_gz, write_jsonl_zst, write_json, write_txt, write_txt_zst]
 
 
-def scores_by_doc(root: Path, concepts: list[SearchConcept]) -> dict[str, float]:
-    return {h.doc_id.split(".")[0]: h.score for h in search(root, concepts).hits}
+def scores_by_doc(
+    root: Path, concepts: list[SearchConcept], match: MatchMode = "word"
+) -> dict[str, float]:
+    return {h.doc_id.split(".")[0]: h.score for h in search(root, concepts, match=match).hits}
 
 
 @pytest.mark.parametrize("write", WRITERS, ids=lambda w: w.__name__.removeprefix("write_"))
 def test_every_format_scores_the_same(tmp_path: Path, write: Writer) -> None:
     write(tmp_path, DOCS)
     assert scores_by_doc(tmp_path, [CONCEPT]) == {
-        # a: chunk 0 "cat" 100; chunk 1 "cat" (in category) + "pets" 105 → max 105
-        "a": 105.0,
+        # a: chunk 0 "cat" 100; chunk 1 "pets" 5 ("category" isn't "cat") → max 100
+        "a": 100.0,
         # b: chunk 0 "Ron" 100 ("front" has "ron", not "Ron"); chunk 1 all four terms: 170
         "b": 170.0,
         # d: "cat" counts once per chunk
         "d": 100.0,
     }
+
+
+def test_substring_matching_finds_terms_inside_words(tmp_path: Path) -> None:
+    write_jsonl(tmp_path, DOCS)
+    # a: chunk 1 "cat" (in category) + "pets" 105
+    assert scores_by_doc(tmp_path, [CONCEPT], match="substring")["a"] == 105.0
+
+
+@pytest.mark.parametrize(
+    ("text", "term", "found"),
+    [
+        ("smuggled goods", "muggle", False),
+        ("a muggle", "muggle", True),
+        ("Hermione's wand", "Hermione", True),
+        ("Hermione-like", "Hermione", True),
+        ("(cat)", "cat", True),
+        ("cats", "cat", False),
+        ("scat", "cat", False),
+        ("cat2", "cat", False),
+        ("2024", "202", False),
+        # A term edge that isn't a letter or digit needs no boundary.
+        ("U.S.A.", "U.S.", True),
+        ("Ron's", "'s", True),
+        # Scripts without spaces match anywhere, Latin next to them included.
+        ("寻找近地小行星", "近地", True),
+        ("東京タワー", "タワー", True),
+        ("用iPhone拍", "iPhone", True),
+        ("กรุงเทพมหานคร", "เทพ", True),
+        ("학교에서", "학교", True),
+        # Other scripts with spaces keep their boundaries.
+        ("Москва", "Моск", False),
+        ("café au lait", "café", True),
+        ("cafés", "café", False),
+    ],
+)
+def test_whole_word_boundaries(text: str, term: str, found: bool) -> None:
+    start = text.index(term)
+    assert whole_word(text, start, start + len(term)) is found
+
+
+def test_word_matching_skips_matches_inside_words_but_keeps_later_ones(tmp_path: Path) -> None:
+    write_jsonl(tmp_path, [{"id": "x", "text": "smuggled by a muggle"}])
+    [hit] = search(tmp_path, [SearchConcept(("muggle",), (100.0,))]).hits
+    assert [(m.start, m.end) for m in hit.matches] == [(14, 20)]
+
+
+def test_distinct_chunks_keeps_each_texts_best_hit() -> None:
+    def hit(doc_id: str, text: str, score: float) -> Hit:
+        return Hit("f", doc_id, 0, 0, text, score, (score,), ())
+
+    hits = [hit("1", "same", 9), hit("2", "other", 8), hit("3", "same", 7), hit("4", "x", 6)]
+    assert [h.doc_id for h in distinct_chunks(hits)] == ["1", "2", "4"]
 
 
 def test_hit_has_the_best_chunk_and_its_spans(tmp_path: Path) -> None:
@@ -112,7 +175,7 @@ def test_multi_concept_uses_the_geometric_mean(tmp_path: Path) -> None:
     rons = SearchConcept(("Ron",), (100.0,))
     scores = scores_by_doc(tmp_path, [cats, rons])
     # No chunk matches both, so every score is ~sqrt(s · ε).
-    assert scores["a"] == pytest.approx(combine([105.0, 0.0]))
+    assert scores["a"] == pytest.approx(combine([100.0, 0.0]))
     assert scores["b"] == pytest.approx(combine([0.0, 100.0]))
     assert combine([105.0, 0.0]) == pytest.approx(np.sqrt((105 + 1e-6) * 1e-6))
     both = [{"id": "z", "text": "cat and Ron"}]

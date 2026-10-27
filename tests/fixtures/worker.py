@@ -107,7 +107,7 @@ def insert_concept_job(
 
 
 def insert_search_job(
-    database: DatabaseSettings, concept_ids: list[UUID], **params: int
+    database: DatabaseSettings, concept_ids: list[UUID], **params: int | str
 ) -> tuple[UUID, UUID]:
     """A search and its queued job, as the API creates them. Returns (search id, job id)."""
     with psycopg.connect(database.conninfo("owner")) as conn:

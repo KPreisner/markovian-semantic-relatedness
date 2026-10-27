@@ -28,7 +28,7 @@ async def create_search(
 ) -> SearchStarted:
     try:
         params = SearchParams.model_validate(
-            request.model_dump(include={"top_k_terms", "top_n"}, exclude_none=True)
+            request.model_dump(include={"top_k_terms", "top_n", "match"}, exclude_none=True)
         )
     except ValidationError as e:
         raise UnprocessableError(
