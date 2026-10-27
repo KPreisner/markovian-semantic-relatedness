@@ -1,18 +1,24 @@
-# The worker from source (`task dev:up:worker`): the develop target with packages/ bind-mounted,
+# Both workers from source (`task dev:up:worker`): the develop target with packages/ bind-mounted,
 # and Celery restarted whenever a .py file changes. A restart sends SIGTERM (a warm shutdown) and
 # kills Celery 10 s later, so a job still running then is redelivered and runs again.
+x-dev-worker: &dev-worker
+  image: msr-worker:develop
+  entrypoint:
+    - watchmedo
+    - auto-restart
+    - --directory=/app/packages
+    - --pattern=*.py
+    - --recursive
+    - --signal=SIGTERM
+    - --
+  volumes:
+    - ./packages:/app/packages
+
 services:
-  worker:
-    image: msr-worker:develop
+  worker-cpu:
+    <<: *dev-worker
     build:
       target: develop
-    entrypoint:
-      - watchmedo
-      - auto-restart
-      - --directory=/app/packages
-      - --pattern=*.py
-      - --recursive
-      - --signal=SIGTERM
-      - --
-    volumes:
-      - ./packages:/app/packages
+  # Uses worker-cpu's develop image (pull_policy: never, from compose.yaml).
+  worker-search:
+    <<: *dev-worker

@@ -5,17 +5,20 @@
 - **Runtime:** Celery forks its pool processes from the main process, and a forked Postgres
   connection or Redis socket would be shared by two processes. The main process never opens the
   runtime; each pool process opens its own in `worker_process_init`.
-- **Health checks** (as in forge): Postgres, Redis, and the model mount are checked when the
-  worker starts (`celeryd_init`), when it's ready (`worker_ready`), and before every task
-  (`task_prerun`). A failure raises `SystemExit(1)`, so a worker with a broken dependency never
-  takes a task: the main process exits, or the pool process dies and its task's message is
-  redelivered (`task_reject_on_worker_lost`).
+- **Health checks** (as in forge): Postgres and Redis are checked when the worker starts
+  (`celeryd_init`), when it's ready (`worker_ready`), and before every task (`task_prerun`),
+  which also checks the mount the task needs (`models/` for a concept, `corpora/` for a search;
+  each kind of worker mounts only its own). A failure raises `SystemExit(1)`, so a worker with a
+  broken dependency never takes a task: the main process exits, or the pool process dies and its
+  task's message is redelivered (`task_reject_on_worker_lost`).
 """
 
+from pathlib import Path
 from typing import Any
 
 import psycopg
 import structlog
+from celery import Task
 from celery.signals import (
     celeryd_init,
     setup_logging,
@@ -27,6 +30,7 @@ from celery.signals import (
 )
 from redis import Redis
 
+from msr.jobs.tasks import CONCEPT_TASK, SEARCH_TASK
 from msr.service.logging import configure_logging
 from msr_db.settings import DatabaseSettings
 from msr_worker.app import settings
@@ -53,8 +57,9 @@ def close_runtime() -> None:
         _runtime = None
 
 
-def check_health(signal: str) -> None:
-    """Raise `SystemExit(1)` unless Postgres, Redis, and the model mount are usable."""
+def check_health(signal: str, mount: Path | None = None) -> None:
+    """Raise `SystemExit(1)` unless Postgres, Redis, and `mount` (the data a task needs) are
+    usable."""
     failures: dict[str, str] = {}
     try:
         with psycopg.connect(DatabaseSettings().conninfo("worker"), connect_timeout=5) as conn:
@@ -66,8 +71,8 @@ def check_health(signal: str) -> None:
             redis.ping()
     except Exception as e:
         failures["redis"] = str(e)
-    if not settings.models_dir.is_dir():
-        failures["models"] = f"{settings.models_dir} isn't a directory"
+    if mount is not None and not mount.is_dir():
+        failures["mount"] = f"{mount} isn't a directory"
     if failures:
         log.error("health_check_failed", signal=signal, **failures)
         raise SystemExit(1)
@@ -107,5 +112,7 @@ def on_process_shutdown(**_: Any) -> None:
 
 
 @task_prerun.connect
-def on_task_prerun(**_: Any) -> None:
-    check_health("task_prerun")
+def on_task_prerun(task: Task[..., Any], **_: Any) -> None:
+    # A concept worker mounts models/, a search worker corpora/; each checks its own.
+    mounts = {CONCEPT_TASK: settings.models_dir, SEARCH_TASK: settings.corpora_dir}
+    check_health("task_prerun", mounts.get(task.name))

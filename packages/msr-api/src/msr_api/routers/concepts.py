@@ -5,9 +5,10 @@ from fastapi import APIRouter, Query
 
 from msr_api.dependencies import Connection
 from msr_api.schemas.concepts import Concept
+from msr_api.schemas.errors import NOT_FOUND, UNPROCESSABLE
 from msr_api.services import concepts
 
-router = APIRouter(prefix="/concepts", tags=["concepts"])
+router = APIRouter(prefix="/concepts", tags=["concepts"], responses=NOT_FOUND | UNPROCESSABLE)
 
 
 @router.get("/{concept_id}")

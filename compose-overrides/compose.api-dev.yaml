@@ -1,7 +1,6 @@
 # The API from source with hot reload (`task dev:up:api`): the develop target, packages/
-# bind-mounted, and uvicorn --reload. For local poking only, it's also published on
-# 127.0.0.1:8000 (Swagger UI at /docs). A container on an internal network can't publish ports,
-# so the API joins a second, non-internal network here. The default stack publishes nothing.
+# bind-mounted, and uvicorn --reload. Like the default, it's reached through web, with its docs at
+# http://127.0.0.1:3000/fastapi/docs.
 services:
   api:
     image: msr-api:develop
@@ -13,14 +12,9 @@ services:
       - msr_api.main:create_app
       - --host=0.0.0.0
       - --port=8000
+      - --root-path=/fastapi
       - --no-access-log
       - --reload
       - --reload-dir=/app/packages
     volumes:
       - ./packages:/app/packages
-    ports:
-      - "127.0.0.1:8000:8000"
-    networks: [backend, dev]
-
-networks:
-  dev:

@@ -5,7 +5,7 @@ import psycopg
 import pytest
 from psycopg.types.json import Jsonb
 
-from msr.jobs.tasks import CPU_QUEUE, SEARCH_TASK
+from msr.jobs.tasks import SEARCH_QUEUE, SEARCH_TASK
 from tests.fixtures.api import CORPUS_ID, MODEL_ID, RunningApi, default_params, insert_concept
 
 pytestmark = pytest.mark.integration
@@ -20,6 +20,9 @@ def test_a_search_records_itself_and_queues_a_job(client: httpx.Client, api: Run
     )
     assert response.status_code == 202
     started = response.json()
+    assert started["job"]["job_id"] == started["job_id"]
+    assert (started["job"]["status"], started["job"]["attempts"]) == ("queued", 0)
+    assert started["job"]["compute_seconds"] is None and started["job"]["warnings"] == []
     search = client.get(f"/searches/{started['search_id']}").json()
     assert search["model_id"] == MODEL_ID and search["corpus_id"] == CORPUS_ID
     assert search["concept_ids"] == [str(cat), str(hat)]
@@ -29,7 +32,11 @@ def test_a_search_records_itself_and_queues_a_job(client: httpx.Client, api: Run
     assert search["job"]["params"] == {"search_id": started["search_id"]}
     assert search["hits"] == []
     (call,) = api.publisher.calls
-    assert (call.task, str(call.job_id), call.queue) == (SEARCH_TASK, started["job_id"], CPU_QUEUE)
+    assert (call.task, str(call.job_id), call.queue) == (
+        SEARCH_TASK,
+        started["job_id"],
+        SEARCH_QUEUE,
+    )
 
 
 def test_hits_come_back_ranked(client: httpx.Client, api: RunningApi) -> None:

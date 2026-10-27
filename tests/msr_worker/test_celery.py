@@ -16,6 +16,7 @@ import httpx
 import psycopg
 import pytest
 
+from msr.jobs.tasks import CPU_QUEUE, SEARCH_QUEUE
 from msr_api.core.config import ApiSettings
 from msr_api.main import create_app
 from msr_api.services.publisher import CeleryPublisher, celery_app
@@ -37,6 +38,7 @@ class Stack:
     url: str
     env: dict[str, str]
     worker: WorkerProcess
+    """The concept worker (`cpu`); a search worker runs alongside."""
     tmp: Path
 
 
@@ -49,12 +51,13 @@ def stack(clean: DatabaseSettings, worker_data: Path, tmp_path: Path) -> Iterato
         app = create_app(settings=settings, database=clean, publisher=publisher)
         with (
             serve(app) as url,
-            running_worker(env, tmp_path / "worker-1.log", name="w1") as worker,
+            running_worker(env, tmp_path / "cpu-1.log", name="cpu1", queue=CPU_QUEUE) as worker,
+            running_worker(env, tmp_path / "search.log", name="search1", queue=SEARCH_QUEUE) as s,
         ):
             try:
                 yield Stack(url, env, worker, tmp_path)
             except BaseException:
-                print(worker.output())
+                print(worker.output(), s.output())
                 raise
 
 
@@ -93,7 +96,10 @@ def test_a_concept_streams_to_its_result_and_is_then_a_cache_hit(stack: Stack) -
 
     again = post(stack, f"/models/{MODEL_ID}/concepts", {"root": "cat"})
     assert again.status_code == 200
-    assert again.json() == {"status": "ready", "concept_id": concept_id, "job_id": None}
+    ready = again.json()
+    assert (ready["status"], ready["concept_id"], ready["job_id"]) == ("ready", concept_id, None)
+    assert (ready["job"]["job_id"], ready["job"]["status"]) == (job_id, "succeeded")
+    assert ready["job"]["attempts"] == 1 and ready["job"]["compute_seconds"] > 0
     concept = get(stack, f"/concepts/{concept_id}")
     assert concept["terms"][0]["term"] == "cat" and concept["terms"][0]["weight"] == 100.0
 
@@ -127,9 +133,23 @@ def test_a_search_streams_to_its_result_and_serves_its_hits(stack: Stack) -> Non
     scans = [data for _, data in events if data["type"] == "progress"]
     assert scans and scans[-1]["bytes_scanned"] > 0
 
+    assert started.json()["job"]["status"] == "queued"
     search = get(stack, f"/searches/{search_id}")
-    assert search["job"]["status"] == "succeeded"
+    assert search["job"]["status"] == "succeeded" and search["job"]["attempts"] == 1
+    assert search["job"]["compute_seconds"] > 0
     assert search["hits"][0]["doc_id"] == "n1" and search["hits"][0]["rank"] == 1
+
+
+def test_health_counts_the_running_worker(stack: Stack) -> None:
+    body = get(stack, "/health")
+    assert body["status"] == "ok"
+    assert body["workers"]["count"] == 2
+    assert [n.split("@")[0] for n in body["workers"]["nodes"]] == ["cpu1", "search1"]
+    assert body["broker"]["queues"] == [
+        {"name": "cpu", "messages": 0, "consumers": 1},
+        {"name": "gpu", "messages": None, "consumers": None},
+        {"name": "search", "messages": 0, "consumers": 1},
+    ]
 
 
 def test_a_killed_workers_job_is_redelivered_and_finishes(stack: Stack) -> None:
@@ -142,7 +162,7 @@ def test_a_killed_workers_job_is_redelivered_and_finishes(stack: Stack) -> None:
 
     stack.worker.kill()  # mid-walk: the message is unacked, so RabbitMQ requeues it
     assert get(stack, f"/jobs/{job_id}")["status"] == "running"
-    with running_worker(stack.env, stack.tmp / "worker-2.log", name="w2") as second:
+    with running_worker(stack.env, stack.tmp / "cpu-2.log", name="cpu2", queue=CPU_QUEUE) as second:
         try:
             job = wait_for(stack, job_id, status="succeeded", timeout=120)
         except AssertionError:

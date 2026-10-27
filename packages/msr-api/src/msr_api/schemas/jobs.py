@@ -21,8 +21,11 @@ class Job(Schema):
     progress: dict[str, Any] | None = Field(description="The last progress event, throttled")
     result_id: UUID | None = Field(description="The concept or search, once succeeded")
     error: JobError | None
-    attempts: int
-    warnings: list[str]
+    attempts: int = Field(description="Attempts started (a retried or redelivered job has more)")
+    warnings: list[str] = Field(description="E.g. a retry and why, or a restart after a crash")
     created_at: datetime
-    started_at: datetime | None
+    started_at: datetime | None = Field(description="When the latest attempt started")
     finished_at: datetime | None
+    compute_seconds: float | None = Field(
+        description="How long the latest attempt ran: until it finished, or so far while running"
+    )

@@ -44,9 +44,11 @@ def events(runtime: Runtime, job_id: UUID) -> list[JobEvent]:
     return [JOB_EVENT.validate_json(fields[STREAM_FIELD]) for _, fields in entries]
 
 
-def concept_rows(database: DatabaseSettings) -> list[tuple[UUID, int, list[float]]]:
+def concept_rows(database: DatabaseSettings) -> list[tuple[UUID, int, list[float], UUID | None]]:
     with psycopg.connect(database.conninfo("owner")) as conn:
-        return conn.execute("SELECT concept_id, root_idx, weight FROM msr.concepts").fetchall()
+        return conn.execute(
+            "SELECT concept_id, root_idx, weight, job_id FROM msr.concepts"
+        ).fetchall()
 
 
 def test_a_concept_job_stores_the_concept_and_streams_its_walk(
@@ -59,8 +61,9 @@ def test_a_concept_job_stores_the_concept_and_streams_its_walk(
     job = load(runtime, job_id)
     assert (job.status, job.attempts, job.worker_id, job.warnings) == ("succeeded", 1, "test/1", [])
     assert job.started_at is not None and job.finished_at is not None
-    [(concept_id, root_idx, weight)] = concept_rows(clean)
+    [(concept_id, root_idx, weight, built_by)] = concept_rows(clean)
     assert job.result_id == concept_id and root_idx == toy.VOCAB.index("cat")
+    assert built_by == job_id
     assert weight[0] == pytest.approx(100.0)
     saved = worker_data / "concepts" / MODEL_ID / concept_dir_name(root_idx, params)
     assert load_concept(saved).term_idx.tolist()[0] == root_idx
@@ -84,7 +87,8 @@ def test_a_cached_concept_is_reused_without_walking(
     run(runtime, second)
     assert load(runtime, second).result_id == load(runtime, first).result_id
     assert [e.type for e in events(runtime, second)] == ["result"]
-    assert len(concept_rows(clean)) == 1
+    [(_, _, _, built_by)] = concept_rows(clean)
+    assert built_by == first  # the job that found it cached didn't build it
 
 
 def test_saved_files_are_reused_when_the_row_is_missing(

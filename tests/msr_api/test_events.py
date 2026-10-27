@@ -155,7 +155,7 @@ def test_a_disconnect_ends_the_stream_but_not_the_job(
     time.sleep(0.5)
     job = client.get(f"/jobs/{job_id}").json()
     assert job["status"] == "queued" and job["error"] is None
-    assert client.get("/health").status_code == 200
+    assert client.get("/health/live").status_code == 200
 
 
 def test_a_block_longer_than_redis_defaults_keeps_the_stream_open(

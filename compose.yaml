@@ -5,7 +5,51 @@ name: msr
 x-env-files: &env-files
   env_file: [.env.static, .env]
 
+# The Celery workers: one worker per container, running one task at a time (scale with more
+# containers, MSR_*_WORKERS). A stop lets the running job finish first (warm shutdown).
+x-worker: &worker
+  image: msr-worker:latest
+  <<: *env-files
+  environment:
+    MSR_DATA_DIR: /data
+  networks: [backend]
+  stop_grace_period: 30m
+  healthcheck:
+    test: ["CMD", "python", "-m", "msr_worker.healthcheck"]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 20s
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+
 services:
+  # The only published port (127.0.0.1:${MSR_WEB_PORT:-3000}). A placeholder until the Next.js UI
+  # (Phase 6): a holding page, and the API under /fastapi/ with its docs at /fastapi/docs.
+  web:
+    image: nginx:1.30.6-alpine
+    # Directories, not single files: an editor that saves by replacing a file would leave a
+    # single-file mount pointing at the old one.
+    volumes:
+      - ./docker/web/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/web/html:/usr/share/nginx/html:ro
+    ports:
+      - "127.0.0.1:${MSR_WEB_PORT:-3000}:80"
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      api:
+        condition: service_healthy
+
   postgres:
     image: msr-db:latest
     build: database
@@ -63,7 +107,8 @@ services:
       timeout: 2s
       retries: 30
 
-  # FastAPI (REST + SSE). Stateless: no data/ mount, only Postgres, Redis, and the broker.
+  # FastAPI (REST + SSE). Stateless: no data/ mount, only Postgres, Redis, and the broker. Reached
+  # from outside only through web, under /fastapi/ (hence --root-path).
   api:
     image: msr-api:latest
     build:
@@ -78,6 +123,7 @@ services:
       - msr_api.main:create_app
       - --host=0.0.0.0
       - --port=8000
+      - --root-path=/fastapi
       - --no-access-log
       - --timeout-graceful-shutdown=15
     networks: [backend]
@@ -86,7 +132,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)"
       interval: 5s
       timeout: 3s
       retries: 20
@@ -99,17 +145,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Celery worker for concept and search jobs on the `cpu` queue. Models and corpora are mounted
-  # read-only; it writes concepts/ and searches/. One task at a time per container (scale with
-  # more containers); a stop lets the running job finish first (warm shutdown).
-  worker:
-    image: msr-worker:latest
+  # Concept jobs from the `cpu` queue: models/ mounted read-only, writes concepts/.
+  # MSR_CPU_WORKERS containers (default 1).
+  worker-cpu:
+    <<: *worker
     build:
       context: .
       dockerfile: docker/python.Dockerfile
       target: final
       args: {MEMBER: msr-worker}
-    <<: *env-files
     command:
       - celery
       - --app=msr_worker.app:celery_app
@@ -122,28 +166,35 @@ services:
       - --without-heartbeat
       - --without-mingle
       - --loglevel=INFO
-    environment:
-      MSR_DATA_DIR: /data
     volumes:
       - ${MSR_DATA_DIR:-./data}/models:/data/models:ro
-      - ${MSR_DATA_DIR:-./data}/corpora:/data/corpora:ro
       - ${MSR_DATA_DIR:-./data}/concepts:/data/concepts
+    deploy:
+      replicas: ${MSR_CPU_WORKERS:-1}
+
+  # Search jobs from the `search` queue: corpora/ mounted read-only, writes searches/. No model is
+  # ever loaded here. MSR_SEARCH_WORKERS containers (default 1).
+  worker-search:
+    <<: *worker
+    # Built by worker-cpu: two services building one tag make each build replace the other's.
+    pull_policy: never
+    command:
+      - celery
+      - --app=msr_worker.app:celery_app
+      - worker
+      - --queues=search
+      - --concurrency=1
+      - --prefetch-multiplier=1
+      - --max-tasks-per-child=50
+      - --without-gossip
+      - --without-heartbeat
+      - --without-mingle
+      - --loglevel=INFO
+    volumes:
+      - ${MSR_DATA_DIR:-./data}/corpora:/data/corpora:ro
       - ${MSR_DATA_DIR:-./data}/searches:/data/searches
-    networks: [backend]
-    stop_grace_period: 30m
-    healthcheck:
-      test: ["CMD", "python", "-m", "msr_worker.healthcheck"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+    deploy:
+      replicas: ${MSR_SEARCH_WORKERS:-1}
 
   # Run-and-exit: `task build:<stage> -- …` runs `docker compose run --rm builder msr …`.
   builder:
@@ -200,6 +251,8 @@ volumes:
   redis-data:
 
 networks:
+  # web's published port.
+  frontend:
   # Nothing on this network reaches the internet or is published to the host.
   backend:
     internal: true

@@ -1,6 +1,6 @@
 """API pieces that need no services: correlation ids, parameter resolution, events."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid7
 
@@ -12,6 +12,7 @@ from msr_api.middleware.correlation_id import parse
 from msr_api.schemas.concepts import ConceptRequest
 from msr_api.services.concepts import resolve_params
 from msr_api.services.events import snapshot_event, terminal_event, valid_last_event_id
+from msr_api.services.jobs import compute_seconds
 from msr_db.rows import JobRow, ModelRow
 
 NOW = datetime(2026, 10, 26, tzinfo=UTC)
@@ -77,6 +78,15 @@ def test_unbuilt_strategies_and_bad_values_are_unprocessable() -> None:
     with pytest.raises(UnprocessableError) as bad:
         resolve_params(model({"degree-mean": 10}), ConceptRequest(root="cat", trim_ratio=1.5))
     assert bad.value.code == "invalid_request"
+
+
+def test_compute_time_is_the_latest_attempts_run_time() -> None:
+    started = datetime(2026, 10, 26, 12, 0, 0, tzinfo=UTC)
+    assert compute_seconds(job()) is None  # not started
+    finished = job(started_at=started, finished_at=started + timedelta(seconds=7.5))
+    assert compute_seconds(finished) == 7.5
+    running = job(started_at=started)
+    assert compute_seconds(running, now=started + timedelta(seconds=3)) == 3.0
 
 
 def test_correlation_ids_must_be_uuids() -> None:

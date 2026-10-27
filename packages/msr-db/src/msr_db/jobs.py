@@ -16,7 +16,7 @@ from psycopg import AsyncConnection, Connection
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from msr_db.rows import JobRow
+from msr_db.rows import JobCountsRow, JobRow
 
 ACTIVE = ("queued", "running")
 TERMINAL = ("succeeded", "failed")
@@ -47,6 +47,15 @@ JOB_FOR_SEARCH = """
     WHERE job_type = 'search' AND params->>'search_id' = %s
     ORDER BY created_at DESC
     LIMIT 1
+"""
+JOB_COUNTS = """
+    SELECT
+        count(*) FILTER (WHERE status = 'queued')::integer AS queued,
+        count(*) FILTER (WHERE status = 'running')::integer AS running,
+        extract(epoch FROM now() - min(created_at) FILTER (WHERE status = 'queued'))::float8
+            AS oldest_queued_seconds
+    FROM msr.jobs
+    WHERE status IN ('queued', 'running')
 """
 JOB_SET_TASK = "UPDATE msr.jobs SET task_id = %s WHERE job_id = %s"
 JOB_FAIL = """
@@ -117,6 +126,14 @@ class AsyncJobRepository:
         async with self.conn.cursor(row_factory=class_row(JobRow)) as cur:
             await cur.execute(JOB_FOR_SEARCH, (str(search_id),))
             return await cur.fetchone()
+
+    async def counts(self) -> JobCountsRow:
+        """Active jobs, for the health report."""
+        async with self.conn.cursor(row_factory=class_row(JobCountsRow)) as cur:
+            await cur.execute(JOB_COUNTS)
+            row = await cur.fetchone()
+            assert row is not None  # an aggregate always returns a row
+            return row
 
     async def set_task(self, job_id: UUID, task_id: str) -> None:
         """Record the published task. Set only after the broker confirmed the publish."""

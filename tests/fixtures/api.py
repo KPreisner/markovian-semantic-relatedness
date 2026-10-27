@@ -93,15 +93,18 @@ def default_params(**overrides: object) -> ConceptParams:
     return ConceptParams.model_validate({"steps": STEPS, **overrides})
 
 
-def insert_concept(database: DatabaseSettings, root: str, params: ConceptParams) -> UUID:
+def insert_concept(
+    database: DatabaseSettings, root: str, params: ConceptParams, *, job_id: UUID | None = None
+) -> UUID:
     """A cached concept for `root`, as the worker would write it: the root first, then two
-    other terms."""
+    other terms. `job_id` is the job that built it, if any."""
     root_idx = toy.VOCAB.index(root)
     others = [i for i in range(len(toy.VOCAB)) if i != root_idx][:2]
     with psycopg.connect(database.conninfo("owner")) as conn:
         row = conn.execute(
             "INSERT INTO msr.concepts (model_id, root_idx, params, params_hash, term_idx, "
-            "weight, cooccur) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING concept_id",
+            "weight, cooccur, job_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING concept_id",
             (
                 MODEL_ID,
                 root_idx,
@@ -110,6 +113,7 @@ def insert_concept(database: DatabaseSettings, root: str, params: ConceptParams)
                 [root_idx, *others],
                 [100.0, 50.0, 25.0],
                 [3, 2, 1],
+                job_id,
             ),
         ).fetchone()
     assert row is not None
@@ -168,13 +172,18 @@ def running_api(database: DatabaseSettings, *, sse_block_ms: int = 300) -> Itera
 
 
 def read_events(
-    url: str, job_id: str, *, last_event_id: str | None = None, limit: int | None = None
+    url: str,
+    job_id: str,
+    *,
+    last_event_id: str | None = None,
+    limit: int | None = None,
+    timeout: float = 10,
 ) -> list[Event]:
     """Parse the SSE stream until the server closes it (or `limit` events arrive)."""
     headers = {"Last-Event-ID": last_event_id} if last_event_id else {}
     events: list[Event] = []
     with (
-        httpx.Client(base_url=url, timeout=10) as client,
+        httpx.Client(base_url=url, timeout=timeout) as client,
         client.stream("GET", f"/jobs/{job_id}/events", headers=headers) as response,
     ):
         assert response.status_code == 200

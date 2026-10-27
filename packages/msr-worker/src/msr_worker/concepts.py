@@ -73,6 +73,7 @@ def run_concept(runtime: Runtime, job: JobRow, reporter: Reporter) -> UUID | Non
             term_idx=concept.term_idx.tolist(),
             weight=concept.weight.tolist(),
             cooccur=concept.cooccur.tolist(),
+            job_id=job.job_id,
         )
         if not succeed(conn, job, concept_id):
             conn.rollback()

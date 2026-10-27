@@ -197,9 +197,11 @@ def ping(vhost: str, node: str, timeout: float = 1.0) -> bool:
 
 
 @contextmanager
-def running_worker(env: dict[str, str], log: Path, *, name: str) -> Iterator[WorkerProcess]:
-    """A real `celery worker` on the `cpu` queue, started like the compose service, in its own
-    process group. Waits until it answers a ping."""
+def running_worker(
+    env: dict[str, str], log: Path, *, name: str, queue: str
+) -> Iterator[WorkerProcess]:
+    """A real `celery worker` on `queue`, started like the compose services, in its own process
+    group. Waits until it answers a ping."""
     node = f"{name}@{os.uname().nodename}"
     command = [
         sys.executable,
@@ -209,7 +211,7 @@ def running_worker(env: dict[str, str], log: Path, *, name: str) -> Iterator[Wor
         "msr_worker.app:celery_app",
         "worker",
         "--queues",
-        "cpu",
+        queue,
         "--concurrency",
         "1",
         "--hostname",

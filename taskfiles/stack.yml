@@ -41,7 +41,7 @@ tasks:
       - docker compose {{.FILES}} build
       - docker compose {{.FILES}} run --rm migrate
       - >-
-        docker compose {{.FILES}} up -d --wait --no-deps
+        docker compose {{.FILES}} up -d --wait --no-deps --remove-orphans
         $(docker compose {{.FILES}} config --services | grep -vx migrate)
 
   down:
@@ -57,6 +57,50 @@ tasks:
     cmds:
       - docker compose --profile build --profile test down --volumes --rmi local --remove-orphans
       - docker image rm -f msr-builder:develop msr-api:develop msr-worker:develop
+
+  # Postgres first (one transaction), then the progress streams, then the files: a concept or
+  # search can't be served once its rows are gone. The files are removed from the worker container
+  # that writes them (worker-cpu: concepts/, worker-search: searches/), which mounts the same data/
+  # (MSR_DATA_DIR) and owns what it wrote.
+  clear-results:
+    desc: "Delete every concept, search, and job: Postgres rows, Redis progress streams, data/concepts/, and data/searches/ (the msr CLI's too). Models, X′, and corpora stay. Refuses while a job is queued or running (FORCE=1 clears anyway)"
+    dir: "{{.ROOT_DIR}}"
+    prompt: This deletes every concept, search, and job, in Postgres and under data/concepts/ and data/searches/. Continue?
+    vars:
+      PSQL: >-
+        docker compose exec -T postgres sh -c
+        'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$MSR_DB_NAME" "$@"' psql
+    cmds:
+      - |
+        active=$({{.PSQL}} -tAc "SELECT count(*) FROM msr.jobs WHERE status IN ('queued', 'running')")
+        if [ "$active" != 0 ] && [ "{{.FORCE}}" != 1 ]; then
+          echo "$active job(s) are queued or running: wait for them, or FORCE=1 to clear anyway" >&2
+          exit 1
+        fi
+      - >-
+        {{.PSQL}} --single-transaction -q
+        -c "SELECT (SELECT count(*) FROM msr.concepts) AS concepts, (SELECT count(*) FROM msr.searches) AS searches, (SELECT count(*) FROM msr.jobs) AS jobs"
+        -c "DELETE FROM msr.searches"
+        -c "DELETE FROM msr.concepts"
+        -c "DELETE FROM msr.jobs"
+      - >-
+        docker compose exec -T redis sh -c
+        "redis-cli --scan --pattern 'msr:job:*:events' | xargs -r redis-cli del >/dev/null; echo 'progress streams: deleted'"
+      - >-
+        docker compose run --rm --no-deps -T --entrypoint sh worker-cpu -c
+        'echo "data/concepts: $(find /data/concepts -mindepth 1 -maxdepth 1 | wc -l) entries deleted";
+        find /data/concepts -mindepth 1 -delete'
+      - >-
+        docker compose run --rm --no-deps -T --entrypoint sh worker-search -c
+        'echo "data/searches: $(find /data/searches -mindepth 1 -maxdepth 1 | wc -l) entries deleted";
+        find /data/searches -mindepth 1 -delete'
+
+  smoke:
+    desc: "End-to-end smoke test: the whole stack in its own Compose project (msr-smoke), toy model → concept job → search job through web"
+    dir: "{{.ROOT_DIR}}"
+    deps: [validate]
+    cmds:
+      - uv run pytest -m smoke {{.CLI_ARGS}}
 
   logs:
     desc: "Show logs (e.g. -- postgres)"

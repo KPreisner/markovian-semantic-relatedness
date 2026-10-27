@@ -20,7 +20,7 @@ CONCEPT_FIND = """
     WHERE model_id = %s AND root_idx = %s AND params_hash = %s
 """
 CONCEPT_FOR_ROOT = """
-    SELECT concept_id, params, params_hash, created_at FROM msr.concepts
+    SELECT concept_id, params, params_hash, created_at, job_id FROM msr.concepts
     WHERE model_id = %s AND root_idx = %s
     ORDER BY created_at, concept_id
 """
@@ -31,8 +31,8 @@ CONCEPT_MODELS = """
 # the caller reads that row's id with CONCEPT_FIND.
 CONCEPT_INSERT = """
     INSERT INTO msr.concepts
-        (model_id, root_idx, params, params_hash, term_idx, weight, cooccur)
-    VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (model_id, root_idx, params, params_hash, term_idx, weight, cooccur, job_id)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (model_id, root_idx, params_hash) DO NOTHING
     RETURNING concept_id
 """
@@ -107,9 +107,10 @@ class ConceptRepository:
         term_idx: Sequence[int],
         weight: Sequence[float],
         cooccur: Sequence[int],
+        job_id: UUID,
     ) -> UUID:
-        """Store a concept and return its id, or the id of the one already stored with this
-        key."""
+        """Store a concept built by `job_id` and return its id, or the id of the one already
+        stored with this key."""
         row = self.conn.execute(
             CONCEPT_INSERT,
             (
@@ -120,6 +121,7 @@ class ConceptRepository:
                 list(term_idx),
                 list(weight),
                 list(cooccur),
+                job_id,
             ),
         ).fetchone()
         if row is not None:

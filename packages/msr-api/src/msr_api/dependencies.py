@@ -10,6 +10,7 @@ from psycopg_pool import AsyncConnectionPool
 from redis.asyncio import Redis
 
 from msr_api.core.config import ApiSettings
+from msr_api.services.broker import BrokerMonitor
 from msr_api.services.publisher import TaskPublisher
 
 
@@ -41,6 +42,11 @@ def get_publisher(request: Request) -> TaskPublisher:
     return publisher
 
 
+def get_monitor(request: Request) -> BrokerMonitor:
+    monitor: BrokerMonitor = request.app.state.monitor
+    return monitor
+
+
 def get_correlation_id(request: Request) -> UUID | None:
     value: UUID | None = getattr(request.state, "correlation_id", None)
     return value
@@ -51,4 +57,5 @@ Pool = Annotated[AsyncConnectionPool[AsyncConnection[Any]], Depends(get_pool)]
 Connection = Annotated[AsyncConnection[Any], Depends(get_connection)]
 RedisClient = Annotated[Redis, Depends(get_redis)]
 Publisher = Annotated[TaskPublisher, Depends(get_publisher)]
+Monitor = Annotated[BrokerMonitor, Depends(get_monitor)]
 CorrelationId = Annotated[UUID | None, Depends(get_correlation_id)]
