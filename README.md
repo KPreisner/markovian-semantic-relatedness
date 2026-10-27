@@ -19,9 +19,14 @@ is a from-scratch reimplementation for my portfolio.
 (Preisner, Digirolamo, Flowers, Breech, Kosloski, 2022). It's a U.S. Government work; see
 [NOTICE](docs/paper/NOTICE.md).
 
+📐 **Design notes:** [where this implementation departs from the paper, and why](docs/design.md):
+a root's distance to itself is 0, so it's always the strongest term of its concept; Eq. 23's
+scaling as the tables use it; whole-word search on raw text; and more.
+
 > [!NOTE]
-> Work in progress. The planned stack is a Python core with CPU, CuPy, and C++/CUDA walk
-> backends, FastAPI, Celery, Postgres, a Next.js UI, and Docker Compose.
+> Work in progress. The stack is a Python core with a CPU walk, FastAPI, Celery, Postgres, a
+> Next.js UI, and Docker Compose. CuPy and C++/CUDA walk backends and the bilingual
+> English–Chinese model are still to come.
 
 ## Repository layout
 
@@ -60,6 +65,7 @@ task web:typecheck        # tsc, with Next's route types
 task web:test             # Vitest: the BFF's API client, route handlers, and SSE relay
 task web:typegen          # regenerate web/openapi.json and the BFF's types and Zod schemas from the API
 task web:npm -- <args>    # npm in web/, e.g. task web:npm -- install <package>
+task py:check             # py:lint, py:typecheck, and py:test (task web:check does the same for web)
 task check                # lint, typecheck, and test, Python and web; task py-lint is lint + typecheck, as in CI
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```

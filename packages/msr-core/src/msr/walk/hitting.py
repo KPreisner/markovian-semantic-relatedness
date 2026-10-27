@@ -26,8 +26,9 @@ def hitting_times(
 
     A root's distance to itself is 0, the textbook hitting time. Eqs. 11–18 as printed give it a
     return time instead, which on real models is barely shorter than its distance to the
-    references, so its z (the scaling weight w_r) lands near 0 and blows up every other weight.
-    With 0, w_r = μᵣ/σᵣ, which is positive and of the size the paper's tables imply.
+    references, so its z (the scaling weight w_r) can land near 0 and blow up every other weight.
+    With 0, w_r = μᵣ/σᵣ, which is always positive, though larger than the paper's tables imply
+    (see docs/design.md).
     """
     r = np.asarray(roots, dtype=np.intp)
     alpha1 = first_step(model.c, model.rowsum_m, r)
