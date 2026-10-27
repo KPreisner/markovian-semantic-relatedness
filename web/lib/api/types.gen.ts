@@ -423,6 +423,10 @@ export type Job = {
      */
     result_id: string | null;
     /**
+     * A concept job's root term (null for searches)
+     */
+    root: RootTerm | null;
+    /**
      * Started At
      *
      * When the latest attempt started

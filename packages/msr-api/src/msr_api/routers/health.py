@@ -15,13 +15,16 @@ async def health(
     """The stack's health: the API itself, Postgres, Redis, RabbitMQ (with each queue's depth and
     consumers), the workers that answer a ping, and the active jobs. 503 when Postgres, Redis, or
     RabbitMQ is down; `degraded` (still 200) when no worker answers. Takes about a second: the
-    worker ping waits for replies."""
-    body = await health_service.report(
-        pool=pool,
-        redis=redis,
-        monitor=monitor,
-        settings=settings,
-        started=request.app.state.started,
+    worker ping waits for replies. A report is reused for up to `MSR_HEALTH_CACHE_SECONDS`."""
+    cache: health_service.ReportCache = request.app.state.health_cache
+    body = await cache.get(
+        lambda: health_service.report(
+            pool=pool,
+            redis=redis,
+            monitor=monitor,
+            settings=settings,
+            started=request.app.state.started,
+        )
     )
     return JSONResponse(
         body.model_dump(mode="json"), status_code=503 if body.status == "down" else 200

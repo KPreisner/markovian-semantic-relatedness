@@ -714,6 +714,17 @@
             "description": "The concept or search, once succeeded",
             "title": "Result Id"
           },
+          "root": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RootTerm"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A concept job's root term (null for searches)"
+          },
           "started_at": {
             "anyOf": [
               {
@@ -751,6 +762,7 @@
           "job_type",
           "status",
           "model_id",
+          "root",
           "params",
           "progress",
           "result_id",

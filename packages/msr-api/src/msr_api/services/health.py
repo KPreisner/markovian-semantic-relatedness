@@ -141,3 +141,22 @@ async def report(
         workers=found,
         jobs=jobs,
     )
+
+
+class ReportCache:
+    """The last report, reused for `ttl` seconds; concurrent requests wait for one computation.
+    A burst of page loads (or many open tabs) then costs one round of checks, not one each: each
+    round pings every worker and holds broker connections for the ping's whole timeout."""
+
+    def __init__(self, ttl: float) -> None:
+        self.ttl = ttl
+        self._lock = asyncio.Lock()
+        self._report: Health | None = None
+        self._at = 0.0
+
+    async def get(self, compute: Callable[[], Awaitable[Health]]) -> Health:
+        async with self._lock:
+            if self._report is None or time.monotonic() - self._at >= self.ttl:
+                self._report = await compute()
+                self._at = time.monotonic()
+            return self._report

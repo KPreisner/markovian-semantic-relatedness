@@ -128,3 +128,58 @@ def test_events_from_a_job_row() -> None:
 )
 def test_last_event_ids_are_stream_entry_ids(value: str, expected: str | None) -> None:
     assert valid_last_event_id(value) == expected
+
+
+def test_the_health_cache_computes_once_for_concurrent_requests() -> None:
+    import anyio
+
+    from msr_api.services.health import ReportCache
+
+    calls = 0
+
+    async def compute() -> Any:
+        nonlocal calls
+        calls += 1
+        await anyio.sleep(0.05)
+        return {"n": calls}
+
+    async def main() -> list[Any]:
+        cache = ReportCache(ttl=0.2)
+        results: list[Any] = []
+        async with anyio.create_task_group() as tg:
+            for _ in range(5):
+                tg.start_soon(lambda: _append(results, cache.get(compute)))
+        await anyio.sleep(0.25)
+        results.append(await cache.get(compute))  # expired: computed again
+        return results
+
+    async def _append(results: list[Any], value: Any) -> None:
+        results.append(await value)
+
+    results = anyio.run(main)
+    assert results[:5] == [{"n": 1}] * 5
+    assert results[5] == {"n": 2} and calls == 2
+
+
+def test_a_publish_the_broker_never_confirms_times_out() -> None:
+    import threading
+    from uuid import uuid4
+
+    import anyio
+
+    from msr_api.services.publisher import CeleryPublisher
+
+    release = threading.Event()
+
+    class StuckApp:
+        def send_task(self, *args: object, **kwargs: object) -> None:
+            release.wait(5)  # a confirm that never comes
+
+    publisher = CeleryPublisher(StuckApp(), timeout=0.2)  # type: ignore[arg-type]
+    try:
+        with pytest.raises(TimeoutError):
+            anyio.run(
+                lambda: publisher.publish("msr.concept", uuid4(), queue="cpu", correlation_id=None)
+            )
+    finally:
+        release.set()

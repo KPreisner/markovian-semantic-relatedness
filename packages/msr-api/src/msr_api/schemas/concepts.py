@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import ConfigDict, Field
 
 from msr_api.schemas import Schema
-from msr_api.schemas.jobs import Job
+from msr_api.schemas.jobs import Job, RootTerm
 
 
 class ConceptRequest(Schema):
@@ -47,11 +47,6 @@ class ConceptTerm(Schema):
     term_count: int
     weight: float = Field(description="Scaled so the root is `root_weight`")
     cooccur: int = Field(description="C[root, term]")
-
-
-class RootTerm(Schema):
-    term_idx: int
-    term: str
 
 
 class ConceptSummary(Schema):

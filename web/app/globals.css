@@ -1,26 +1,202 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Dark or light follows the system. Tokens are defined once for light below and overridden for
+   dark; components use them through the Tailwind theme (bg-background, text-primary, …). */
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-instrument-serif);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-glow: var(--glow);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Light: paper and ink. */
+:root {
+  --background: oklch(0.985 0.004 90);
+  --foreground: oklch(0.2 0.02 275);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.52 0.22 290);
+  --primary-foreground: oklch(0.985 0.004 90);
+  --secondary: oklch(0.95 0.012 285);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.955 0.008 275);
+  --muted-foreground: oklch(0.48 0.02 275);
+  --accent: oklch(0.56 0.12 215);
+  --accent-foreground: oklch(0.985 0.004 90);
+  --destructive: oklch(0.56 0.21 25);
+  --success: oklch(0.56 0.15 155);
+  --warning: oklch(0.62 0.15 70);
+  --border: oklch(0.2 0.02 275 / 11%);
+  --input: oklch(0.2 0.02 275 / 16%);
+  --ring: oklch(0.52 0.22 290 / 55%);
+  --glow: oklch(0.52 0.22 290 / 18%);
+  --radius: 0.75rem;
+
+  /* One color per concept in a multi-concept search (the API allows up to 10). */
+  --concept-1: oklch(0.55 0.22 290);
+  --concept-2: oklch(0.58 0.13 215);
+  --concept-3: oklch(0.65 0.15 70);
+  --concept-4: oklch(0.6 0.2 350);
+  --concept-5: oklch(0.6 0.16 150);
+  --concept-6: oklch(0.6 0.18 30);
+  --concept-7: oklch(0.55 0.12 250);
+  --concept-8: oklch(0.62 0.14 120);
+  --concept-9: oklch(0.58 0.15 320);
+  --concept-10: oklch(0.6 0.1 190);
+}
+
+/* Dark: ink, with the accent glowing. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: oklch(0.155 0.016 275);
+    --foreground: oklch(0.955 0.006 275);
+    --card: oklch(0.19 0.02 275);
+    --popover: oklch(0.2 0.022 275);
+    --primary: oklch(0.72 0.18 292);
+    --primary-foreground: oklch(0.155 0.016 275);
+    --secondary: oklch(0.24 0.025 280);
+    --muted: oklch(0.23 0.02 275);
+    --muted-foreground: oklch(0.7 0.02 275);
+    --accent: oklch(0.82 0.12 205);
+    --accent-foreground: oklch(0.155 0.016 275);
+    --destructive: oklch(0.7 0.19 22);
+    --success: oklch(0.78 0.15 155);
+    --warning: oklch(0.83 0.14 80);
+    --border: oklch(1 0 0 / 9%);
+    --input: oklch(1 0 0 / 14%);
+    --ring: oklch(0.72 0.18 292 / 60%);
+    --glow: oklch(0.72 0.18 292 / 22%);
+
+    --concept-1: oklch(0.75 0.17 292);
+    --concept-2: oklch(0.82 0.12 205);
+    --concept-3: oklch(0.84 0.14 80);
+    --concept-4: oklch(0.76 0.17 350);
+    --concept-5: oklch(0.8 0.15 150);
+    --concept-6: oklch(0.76 0.15 35);
+    --concept-7: oklch(0.74 0.12 255);
+    --concept-8: oklch(0.84 0.14 120);
+    --concept-9: oklch(0.76 0.14 320);
+    --concept-10: oklch(0.82 0.09 190);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: light dark;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+/* The accent's gradient, for headline words and the active job. */
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-gradient {
+  background-image: linear-gradient(100deg, var(--primary), var(--accent));
+}
+
+/* A faint grid of dots behind the hero and page headers. */
+@utility bg-dots {
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 14%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The walker on the hero graph and the pulse on a running job. Off for reduced motion. */
+@keyframes msr-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes msr-shimmer {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+@utility animate-pulse-soft {
+  animation: msr-pulse 1.6s ease-in-out infinite;
+}
+
+@utility animate-shimmer {
+  background-size: 200% 100%;
+  animation: msr-shimmer 2.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

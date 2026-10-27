@@ -110,44 +110,6 @@ export const zJobError = z.object({
 });
 
 /**
- * Job
- */
-export const zJob = z.object({
-    attempts: z.int(),
-    compute_seconds: z.number().nullable(),
-    created_at: z.iso.datetime({ offset: true }),
-    error: zJobError.nullable(),
-    finished_at: z.iso.datetime({ offset: true }).nullable(),
-    job_id: z.uuid(),
-    job_type: z.enum(['concept', 'search']),
-    model_id: z.string(),
-    params: z.record(z.string(), z.unknown()),
-    progress: z.record(z.string(), z.unknown()).nullable(),
-    result_id: z.uuid().nullable(),
-    started_at: z.iso.datetime({ offset: true }).nullable(),
-    status: z.enum([
-        'queued',
-        'running',
-        'succeeded',
-        'failed'
-    ]),
-    warnings: z.array(z.string())
-});
-
-/**
- * ConceptStatus
- *
- * `ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is
- * that job in full: its status, attempts, warnings, error, and compute time.
- */
-export const zConceptStatus = z.object({
-    concept_id: z.uuid().nullable(),
-    job: zJob.nullable(),
-    job_id: z.uuid().nullable(),
-    status: z.enum(['ready', 'pending'])
-});
-
-/**
  * JobsInfo
  */
 export const zJobsInfo = z.object({
@@ -274,6 +236,32 @@ export const zRootTerm = z.object({
 });
 
 /**
+ * Job
+ */
+export const zJob = z.object({
+    attempts: z.int(),
+    compute_seconds: z.number().nullable(),
+    created_at: z.iso.datetime({ offset: true }),
+    error: zJobError.nullable(),
+    finished_at: z.iso.datetime({ offset: true }).nullable(),
+    job_id: z.uuid(),
+    job_type: z.enum(['concept', 'search']),
+    model_id: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    progress: z.record(z.string(), z.unknown()).nullable(),
+    result_id: z.uuid().nullable(),
+    root: zRootTerm.nullable(),
+    started_at: z.iso.datetime({ offset: true }).nullable(),
+    status: z.enum([
+        'queued',
+        'running',
+        'succeeded',
+        'failed'
+    ]),
+    warnings: z.array(z.string())
+});
+
+/**
  * Concept
  */
 export const zConcept = z.object({
@@ -286,6 +274,19 @@ export const zConcept = z.object({
     root: zRootTerm,
     term_count: z.int(),
     terms: z.array(zConceptTerm)
+});
+
+/**
+ * ConceptStatus
+ *
+ * `ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is
+ * that job in full: its status, attempts, warnings, error, and compute time.
+ */
+export const zConceptStatus = z.object({
+    concept_id: z.uuid().nullable(),
+    job: zJob.nullable(),
+    job_id: z.uuid().nullable(),
+    status: z.enum(['ready', 'pending'])
 });
 
 /**

@@ -6,21 +6,29 @@ import structlog
 from psycopg import AsyncConnection
 
 from msr_api.core.errors import NotFoundError, ServiceUnavailableError
-from msr_api.schemas.jobs import Job, JobError
+from msr_api.schemas.jobs import Job, JobError, RootTerm
 from msr_api.services.publisher import TaskPublisher
 from msr_db.jobs import AsyncJobRepository
+from msr_db.registry import AsyncVocabRepository
 from msr_db.rows import JobRow
 
 log = structlog.get_logger(__name__)
 
 
-def job_out(row: JobRow) -> Job:
+async def job_out(conn: AsyncConnection[Any], row: JobRow) -> Job:
+    """The job as the API returns it, with a concept job's root term from the vocab."""
+    root = None
+    if row.root_idx is not None:
+        term = await AsyncVocabRepository(conn).get(row.model_id, row.root_idx)
+        if term is not None:
+            root = RootTerm(term_idx=term.term_idx, term=term.term)
     error = JobError(code=row.error_code, message=row.error_message) if row.error_code else None
     return Job(
         job_id=row.job_id,
         job_type=row.job_type,
         status=row.status,
         model_id=row.model_id,
+        root=root,
         params=row.params,
         progress=row.progress,
         result_id=row.result_id,

@@ -90,11 +90,24 @@ it needs. The SQL migrations in `database/migration/` are the schema (no ORM): `
 bootstraps the database and roles on every start, and each file in `002_migration/` runs once.
 An applied file never changes; a fix is a new file.
 
-web is the Next.js app (`web/`). The UI calls only its own `/api/*` route handlers (the BFF),
-which call FastAPI inside the stack, validate every response with Zod schemas generated from the
-API's OpenAPI schema, and relay job progress as Server-Sent Events. After changing the API's
-schemas, run `task web:typegen`; CI fails if the generated files are stale. `task dev:up:web` runs
-the web app with `next dev` and hot reload.
+web is the Next.js app (`web/`), the UI at <http://127.0.0.1:3000>:
+
+| Page | What it does |
+|---|---|
+| `/` | what MSR is, with the paper's toy graph and the stack's models, corpora, and workers |
+| `/workbench` | pick a model, autocomplete a root term, set advanced concept parameters, build |
+| `/jobs/{id}` | a concept job's live progress; opens the concept when it's done |
+| `/concepts/{id}` | the ranked concept table, with weights, co-occurrence, counts, and how it was built |
+| `/search` | one or more concepts of a model (building any that are missing) and a corpus |
+| `/searches/{id}` | the scan's live progress, then ranked paragraphs with matches colored by concept |
+| `/health` | the stack's health, refreshed every 5 s |
+
+Concept and search pages have their own addresses, so they can be reloaded, bookmarked, or
+shared; a running job's page picks its progress up again. The UI calls only its own `/api/*`
+route handlers (the BFF), which call FastAPI inside the stack, validate every response with Zod
+schemas generated from the API's OpenAPI schema, and relay job progress as Server-Sent Events.
+After changing the API's schemas, run `task web:typegen`; CI fails if the generated files are
+stale. `task dev:up:web` runs the web app with `next dev` and hot reload.
 
 The API (FastAPI) is reached only through web, under `/fastapi/`. To work on it,
 `task dev:up:api` runs it from source with hot reload, at the same address; `task up` returns to
@@ -226,7 +239,7 @@ All of Simple English with the paper's 1,000 steps (X′ takes hours on CPU):
 
 ```bash
 task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name simplewiki --id simplewiki-1 --description "Simple English Wikipedia 20231101, all parts"
+  --name simplewiki --id simplewiki-1 --description "Simple English Wikipedia 20231101"
 ```
 
 ### 5. Concepts and search

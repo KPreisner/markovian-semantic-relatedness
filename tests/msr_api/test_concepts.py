@@ -39,6 +39,7 @@ def test_a_new_concept_queues_one_job(client: httpx.Client, api: RunningApi) -> 
         [],
     )
     assert body["job"]["compute_seconds"] is None
+    assert body["job"]["root"] == {"term_idx": 3, "term": "cat"}  # what the job is building
     row = job(api, body["job_id"])
     assert (row["job_type"], row["status"], row["root_idx"]) == ("concept", "queued", 3)
     assert row["params_hash"] == concept_key(default_params())

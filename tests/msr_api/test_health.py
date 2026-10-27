@@ -50,7 +50,7 @@ def monitor() -> FakeMonitor:
 @pytest.fixture(scope="module")
 def url(seeded: DatabaseSettings, monitor: FakeMonitor) -> Iterator[str]:
     app = create_app(
-        settings=ApiSettings(health_ping_seconds=0.1),
+        settings=ApiSettings(health_ping_seconds=0.1, health_cache_seconds=0),
         database=seeded,
         publisher=FakePublisher(),
         monitor=monitor,
@@ -116,3 +116,17 @@ def test_a_dead_broker_is_down_and_skips_the_worker_ping(url: str, monitor: Fake
 def test_liveness_checks_nothing_else(url: str, monitor: FakeMonitor) -> None:
     monitor.down = True
     assert httpx.get(f"{url}/health/live").json() == {"status": "ok"}
+
+
+def test_reports_are_reused_within_the_cache_window(seeded: DatabaseSettings) -> None:
+    """A burst of requests costs one round of checks (each round pings every worker)."""
+    monitor = FakeMonitor(nodes=["celery@w1"])
+    app = create_app(
+        settings=ApiSettings(health_ping_seconds=0.1, health_cache_seconds=30),
+        database=seeded,
+        publisher=FakePublisher(),
+        monitor=monitor,
+    )
+    with serve(app) as base:
+        first, second = health(base)[1], health(base)[1]
+    assert first == second and monitor.pinged == 1

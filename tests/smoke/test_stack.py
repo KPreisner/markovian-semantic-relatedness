@@ -35,6 +35,9 @@ MODEL_ID = "smoke-toy"
 CORPUS_ID = "ccnews-en"
 ROOT = Path(__file__).parents[2]
 
+# What the job test built, for the tests after it (the module runs in order).
+BUILT: dict[str, str] = {}
+
 
 @dataclass
 class Stack:
@@ -174,6 +177,29 @@ def test_a_concept_job_then_a_search_job(stack: Stack) -> None:
     assert best["chunk_text"].startswith("Every morning the cat sat in the hat")
     assert best["chunk_index"] == 1  # trafilatura keeps the <h1> as line 0
     assert {"cat", "hat"} <= {m["term"] for m in best["matches"]}
+    BUILT.update(concept_id=concept_id, search_id=search_id, job_id=started.json()["job_id"])
+
+
+def test_the_ui_pages_render_the_results(stack: Stack) -> None:
+    """The screens, server-rendered through web: each page's streamed HTML has its data."""
+    concept_id, search_id = BUILT["concept_id"], BUILT["search_id"]
+
+    def page(path: str) -> str:
+        response = httpx.get(f"{stack.web}{path}", timeout=60)
+        assert response.status_code == 200, path
+        return response.text
+
+    assert "Meaning, found by" in page("/") and MODEL_ID in page("/")
+    assert MODEL_ID in page("/workbench")
+    assert CORPUS_ID in page(f"/search?concepts={concept_id}")
+    concept = page(f"/concepts/{concept_id}")
+    assert ">cat<" in concept and "hat" in concept
+    results = page(f"/searches/{search_id}")
+    assert "Every morning the" in results and CORPUS_ID in results
+    # A finished job's page sends the browser on to its result.
+    assert f"/searches/{search_id}" in page(f"/jobs/{BUILT['job_id']}")
+    assert "Everything is running" in page("/health")
+    assert "Nowhere to" in page("/concepts/00000000-0000-7000-8000-000000000000")
 
 
 def test_clear_results_refuses_while_a_job_is_active_then_clears(stack: Stack) -> None:

@@ -13,11 +13,17 @@ class JobError(Schema):
     message: str | None
 
 
+class RootTerm(Schema):
+    term_idx: int
+    term: str
+
+
 class Job(Schema):
     job_id: UUID
     job_type: Literal["concept", "search"]
     status: Literal["queued", "running", "succeeded", "failed"]
     model_id: str
+    root: RootTerm | None = Field(description="A concept job's root term (null for searches)")
     params: dict[str, Any]
     progress: dict[str, Any] | None = Field(description="The last progress event, throttled")
     result_id: UUID | None = Field(description="The concept or search, once succeeded")

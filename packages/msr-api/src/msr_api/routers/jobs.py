@@ -25,7 +25,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"], responses=NOT_FOUND | UNPROCES
 @router.get("/{job_id}")
 async def get_job(conn: Connection, job_id: UUID) -> Job:
     """The job's durable status, for clients that poll."""
-    return jobs.job_out(await jobs.get_job(conn, job_id))
+    return await jobs.job_out(conn, await jobs.get_job(conn, job_id))
 
 
 @router.get(
