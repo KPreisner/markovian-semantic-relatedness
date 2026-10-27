@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import ConfigDict, Field
@@ -25,6 +25,11 @@ class SearchRequest(Schema):
     corpus: str = Field(min_length=1)
     top_k_terms: int | None = Field(None, description="Concept terms matched (10–1000)")
     top_n: int | None = Field(None, description="Hits kept (1–1000)")
+    match: Literal["word", "substring"] | None = Field(
+        None,
+        description="Match whole words (the default; scripts without spaces match anywhere), "
+        "or substrings, so `cat` also hits `category`",
+    )
 
 
 class SearchStarted(Schema):

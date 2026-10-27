@@ -27,7 +27,7 @@ def test_a_search_records_itself_and_queues_a_job(client: httpx.Client, api: Run
     search = client.get(f"/searches/{started['search_id']}").json()
     assert search["model_id"] == MODEL_ID and search["corpus_id"] == CORPUS_ID
     assert search["concept_ids"] == [str(cat), str(hat)]
-    assert search["params"] == {"top_k_terms": 100, "top_n": 5}
+    assert search["params"] == {"top_k_terms": 100, "top_n": 5, "match": "word"}
     assert search["job"]["job_id"] == started["job_id"]
     assert search["job"]["status"] == "queued"
     assert search["job"]["params"] == {"search_id": started["search_id"]}
@@ -38,6 +38,15 @@ def test_a_search_records_itself_and_queues_a_job(client: httpx.Client, api: Run
         started["job_id"],
         SEARCH_QUEUE,
     )
+
+
+def test_a_search_can_match_substrings(client: httpx.Client, api: RunningApi) -> None:
+    cat = insert_concept(api.database, "cat", default_params())
+    started = client.post(
+        "/searches", json={"concept_ids": [str(cat)], "corpus": CORPUS_ID, "match": "substring"}
+    ).json()
+    search = client.get(f"/searches/{started['search_id']}").json()
+    assert search["params"]["match"] == "substring"
 
 
 def test_hits_come_back_ranked(client: httpx.Client, api: RunningApi) -> None:
@@ -74,6 +83,7 @@ def test_bad_search_requests(client: httpx.Client, api: RunningApi) -> None:
         ({"concept_ids": [cat, cat], "corpus": CORPUS_ID}, 422, "duplicate_concepts"),
         ({"concept_ids": [cat], "corpus": CORPUS_ID, "top_k_terms": 5}, 422, "invalid_request"),
         ({"concept_ids": [], "corpus": CORPUS_ID}, 422, "invalid_request"),
+        ({"concept_ids": [cat], "corpus": CORPUS_ID, "match": "regex"}, 422, "invalid_request"),
     ]
     for body, status, code in cases:
         response = client.post("/searches", json=body)

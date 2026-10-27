@@ -2,8 +2,9 @@
 
 The concepts come from Postgres (top-K ranked terms with their strings joined from vocab), so a
 search never loads a model. The full ranked hits go to `data/searches/<search_id>/hits.jsonl.zst`
-with a `params.json`; the top N go to `msr.search_hits`, written in the same transaction that
-marks the job succeeded.
+with a `params.json`; the top N distinct chunks go to `msr.search_hits` (a chunk text repeated in
+syndicated articles is stored once, at its best rank), written in the same transaction that marks
+the job succeeded.
 """
 
 import shutil
@@ -21,7 +22,14 @@ from pydantic import ValidationError
 from msr.jobs.events import ProgressEvent
 from msr.search.corpus import corpus_files, shards
 from msr.search.params import SearchParams
-from msr.search.scanner import DEFAULT_SHARD_BYTES, Hit, ScanStats, SearchConcept, search
+from msr.search.scanner import (
+    DEFAULT_SHARD_BYTES,
+    Hit,
+    ScanStats,
+    SearchConcept,
+    distinct_chunks,
+    search,
+)
 from msr_db.concepts import ConceptRepository
 from msr_db.registry import CorpusRepository
 from msr_db.rows import JobRow
@@ -83,6 +91,7 @@ def run_search(runtime: Runtime, job: JobRow, reporter: Reporter) -> UUID | None
         top_n=None,
         workers=runtime.settings.search_processes,
         shard_bytes=DEFAULT_SHARD_BYTES,
+        match=params.match,
         progress=progress,
     )
     seconds = time.monotonic() - start
@@ -102,7 +111,8 @@ def run_search(runtime: Runtime, job: JobRow, reporter: Reporter) -> UUID | None
         if not succeed(conn, job, search_id):
             conn.rollback()
             return None
-        SearchRepository(conn).copy_hits(search_id, hit_rows(result.hits[: params.top_n]))
+        stored = distinct_chunks(result.hits)[: params.top_n]
+        SearchRepository(conn).copy_hits(search_id, hit_rows(stored))
     return search_id
 
 

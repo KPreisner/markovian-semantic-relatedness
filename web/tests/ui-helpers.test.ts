@@ -1,9 +1,11 @@
-// The UI's pure helpers: highlight segmentation, formatting, and the recent-concepts store.
+// The UI's pure helpers: highlight segmentation, match strength, formatting, and the recent-concepts
+// store.
 import { describe, expect, it } from "vitest";
 
 import { readRecent, rememberConcept } from "@/lib/client/recent";
 import { formatBytes, formatSeconds, formatWeight, paramsLabel, percent } from "@/lib/format";
 import { segments } from "@/lib/highlight";
+import { strongFor, weakConcepts } from "@/lib/strength";
 
 describe("segments", () => {
   it("splits text at matches and keeps unmatched text plain", () => {
@@ -28,7 +30,7 @@ describe("segments", () => {
     expect(parts.map((p) => p.text).join("")).toBe(text);
   });
 
-  it("counts a substring hit inside a word (no word boundaries, as the scanner)", () => {
+  it("highlights a match inside a word, as a substring search finds", () => {
     expect(segments("category", [{ term: "cat", start: 0, end: 3 }])).toEqual([
       { text: "cat", terms: ["cat"] },
       { text: "egory", terms: [] },
@@ -39,6 +41,46 @@ describe("segments", () => {
     expect(segments("dog", [{ term: "dogs", start: 0, end: 4 }])).toEqual([
       { text: "dog", terms: ["dogs"] },
     ]);
+  });
+});
+
+describe("match strength", () => {
+  const hermione = {
+    root: "Hermione Granger",
+    terms: ["Hermione Granger", "Ron", "Hogwarts", "sorted", "Alfonso Cuarón", "Cuarón"],
+  };
+  // Each term at its own place in the chunk, unless a span is given.
+  const hit = (...terms: (string | [string, number, number])[]) => ({
+    matches: terms.map((t, i) =>
+      typeof t === "string"
+        ? { term: t, start: i * 100, end: i * 100 + t.length }
+        : { term: t[0], start: t[1], end: t[2] },
+    ),
+  });
+
+  it("calls a hit strong with the chosen term, or two of the concept's terms", () => {
+    expect(strongFor(hermione, hit("Hermione Granger"))).toBe(true);
+    expect(strongFor(hermione, hit("Ron", "Hogwarts"))).toBe(true);
+    expect(strongFor(hermione, hit("sorted"))).toBe(false);
+    // The same term found twice is still one term.
+    expect(strongFor(hermione, hit("sorted", "sorted"))).toBe(false);
+  });
+
+  it("counts a term inside a longer matched term as the same mention", () => {
+    const cuaron = hit(["Alfonso Cuarón", 0, 14], ["Cuarón", 8, 14]);
+    expect(strongFor(hermione, cuaron)).toBe(false);
+    expect(strongFor(hermione, hit(["Alfonso Cuarón", 0, 14], ["Cuarón", 40, 46]))).toBe(true);
+  });
+
+  it("counts only the concept's own terms", () => {
+    expect(strongFor(hermione, hit("sorted", "tariff"))).toBe(false);
+  });
+
+  it("names each concept no hit matches strongly", () => {
+    const tariff = { root: "tariff", terms: ["tariff", "trade", "duties"] };
+    expect(weakConcepts([hermione, tariff], [hit("sorted", "tariff"), hit("trade")])).toEqual([0]);
+    expect(weakConcepts([hermione], [])).toEqual([0]);
+    expect(weakConcepts([tariff], [hit("trade", "duties")])).toEqual([]);
   });
 });
 

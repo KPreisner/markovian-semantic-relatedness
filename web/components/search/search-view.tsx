@@ -10,6 +10,7 @@ import type { Search, SearchHit } from "@/lib/api";
 import { useJobEvents } from "@/lib/client/use-job-events";
 import { formatCount, formatScore, formatSeconds } from "@/lib/format";
 import { conceptColor, segments } from "@/lib/highlight";
+import { weakConcepts } from "@/lib/strength";
 
 export type SearchConcept = { concept_id: string; root: string; terms: string[] };
 
@@ -30,6 +31,7 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
     concepts.forEach((c, i) => c.terms.forEach((t) => map.set(t, [...(map.get(t) ?? []), i])));
     return map;
   }, [concepts]);
+  const weak = useMemo(() => weakConcepts(concepts, search.hits), [concepts, search.hits]);
   const maxScores = concepts.map((_, i) =>
     Math.max(...search.hits.map((h) => h.concept_scores[i] ?? 0), Number.EPSILON),
   );
@@ -55,6 +57,11 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
         <Badge variant="outline" className="font-mono">
           top {String(search.params.top_k_terms)} terms · {String(search.params.top_n)} hits
         </Badge>
+        {search.params.match === "substring" && (
+          <Badge variant="outline" className="font-mono">
+            inside words
+          </Badge>
+        )}
         {job && !running && <StatusBadge status={job.status} />}
         {job && !running && (
           <span className="tabular font-mono text-sm text-muted-foreground">
@@ -84,6 +91,20 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
         </p>
       )}
 
+      {search.hits.length > 0 && weak.length > 0 && (
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4 text-sm">
+          <p className="font-medium">
+            No strong matches for {listRoots(weak.map((i) => concepts[i].root))}.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {weak.length === 1 ? "No hit" : "For each of them, no hit"} has the chosen term or two
+            of the concept&rsquo;s terms, so these hits share only loosely related words.{" "}
+            <span className="font-mono">{search.corpus_id}</span> may not cover{" "}
+            {weak.length === 1 ? "it" : "them"}.
+          </p>
+        </div>
+      )}
+
       {search.hits.length > 0 && (
         <ol className="flex flex-col gap-4">
           {search.hits.map((hit) => (
@@ -99,6 +120,13 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
       )}
     </div>
   );
+}
+
+function listRoots(roots: string[]): string {
+  const quoted = roots.map((r) => `“${r}”`);
+  return quoted.length < 3
+    ? quoted.join(" or ")
+    : `${quoted.slice(0, -1).join(", ")}, or ${quoted.at(-1)}`;
 }
 
 function HitCard({

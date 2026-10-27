@@ -327,6 +327,7 @@ export const zSearch = z.object({
 export const zSearchRequest = z.object({
     concept_ids: z.array(z.uuid()).min(1).max(10),
     corpus: z.string().min(1),
+    match: z.enum(['word', 'substring']).nullish(),
     top_k_terms: z.int().nullish(),
     top_n: z.int().nullish()
 });

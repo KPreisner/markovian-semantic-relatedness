@@ -2,10 +2,13 @@
 and a data tree with the toy models: the lifecycle, the exception table, results, and events."""
 
 import logging
+from collections.abc import Iterator
+from compression import zstd
 from pathlib import Path
 from typing import cast
 from uuid import UUID, uuid4
 
+import orjson
 import psycopg
 import pytest
 from celery.exceptions import SoftTimeLimitExceeded
@@ -22,7 +25,7 @@ from msr_worker.progress import Reporter
 from msr_worker.runtime import Runtime
 from msr_worker.searches import run_search
 from tests.fixtures import toy
-from tests.fixtures.api import MODEL_ID, default_params
+from tests.fixtures.api import CORPUS_ID, MODEL_ID, default_params
 from tests.fixtures.worker import NEWS, insert_concept_job, insert_search_job
 
 pytestmark = pytest.mark.integration
@@ -260,9 +263,49 @@ def test_a_search_job_ranks_hits_and_stores_the_top_n(
     stream = events(runtime, job_id)
     scans = [e for e in stream if isinstance(e, ProgressEvent)]
     assert scans[0].step == 0 and scans[-1].step == scans[-1].total == 1
-    # Every document matches: n3's "Nothing" contains "in" (substring matching, no word bounds).
-    assert scans[-1].bytes_scanned and scans[-1].bytes_scanned > 0 and scans[-1].hits == 3
+    # n3 doesn't match: its "Nothing" holds "in", but not as a word.
+    assert scans[-1].bytes_scanned and scans[-1].bytes_scanned > 0 and scans[-1].hits == 2
     assert stream[-1].model_dump() == {"type": "result", "result_id": search_id}
+
+
+def test_a_substring_search_matches_inside_words(runtime: Runtime, clean: DatabaseSettings) -> None:
+    cat = concept_for(runtime, clean, "cat")
+    search_id, job_id = insert_search_job(clean, [cat], match="substring")
+    run(runtime, job_id, run_search)
+    with psycopg.connect(clean.conninfo("owner")) as conn:
+        docs = conn.execute(
+            "SELECT doc_id FROM msr.search_hits WHERE search_id = %s ORDER BY hit_rank",
+            (search_id,),
+        ).fetchall()
+    assert {d for (d,) in docs} == {"n1", "n2", "n3"}
+
+
+@pytest.fixture
+def syndicated(worker_data: Path) -> Iterator[None]:
+    """A second article reprinting n1's best paragraph, for this test only."""
+    path = worker_data / "corpora" / CORPUS_ID / "syndicated.jsonl"
+    text = "Reprinted.\n" + NEWS[0]["text"].split("\n")[1]
+    path.write_bytes(orjson.dumps({"id": "n4", "text": text}) + b"\n")
+    yield
+    path.unlink()
+
+
+@pytest.mark.usefixtures("syndicated")
+def test_a_search_stores_a_repeated_chunk_once(
+    runtime: Runtime, clean: DatabaseSettings, worker_data: Path
+) -> None:
+    cat = concept_for(runtime, clean, "cat")
+    search_id, job_id = insert_search_job(clean, [cat])
+    run(runtime, job_id, run_search)
+    with psycopg.connect(clean.conninfo("owner")) as conn:
+        stored = conn.execute(
+            "SELECT hit_rank, doc_id FROM msr.search_hits WHERE search_id = %s ORDER BY hit_rank",
+            (search_id,),
+        ).fetchall()
+    # n1 and n4 tie on the same paragraph; n1 comes first in corpus order and is the one kept.
+    assert stored == [(1, "n1"), (2, "n2")]
+    with zstd.open(worker_data / "searches" / str(search_id) / "hits.jsonl.zst") as f:
+        assert [orjson.loads(line)["doc_id"] for line in f] == ["n1", "n4", "n2"]
 
 
 def test_a_two_concept_search_scores_with_the_geometric_mean(
