@@ -52,13 +52,16 @@ task py:typecheck         # strict mypy
 task py:format            # auto-format and apply safe lint fixes (alias: task py-format)
 task py:test              # pytest, e.g. task py:test -- -k walk (alias: task py-test)
 task py:test:integration  # integration tests in the compose `test` container, against scratch databases
+task smoke                # end-to-end: the whole stack in its own Compose project, toy model → concept → search
 task check                # lint, typecheck, and test (py:check); task py-lint is lint + typecheck, as in CI
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
 
-The stack (the API, Postgres, RabbitMQ, and Redis so far) runs in Docker Compose. Nothing is
-published to the host. Settings come from `.env.static` (committed, every variable) and `.env` (gitignored,
-secrets and local overrides).
+The stack (web, the API, the workers, Postgres, RabbitMQ, and Redis) runs in Docker Compose. Only
+web is published, on <http://127.0.0.1:3000> (`MSR_WEB_PORT` in `.env` changes the port). It
+serves the API under `/fastapi/`, with interactive docs at <http://127.0.0.1:3000/fastapi/docs>
+(ReDoc at `/fastapi/redoc`). Settings come from
+`.env.static` (committed, every variable) and `.env` (gitignored, secrets and local overrides).
 
 ```bash
 task validate             # check that .env sets every [SECRET] in .env.static (creates .env if missing)
@@ -71,6 +74,7 @@ task destroy              # also delete the volumes and the msr images (asks fir
 task db:migrate           # apply new migrations and exit (a no-op when everything is applied)
 task db:psql              # psql as the read-only reader; ROLE=api|worker|builder|owner|superuser for others
 task db:reset             # delete and recreate the Postgres volume (asks first)
+task clear-results        # delete every concept, search, and job, in Postgres and data/ (asks first; --yes skips)
 ```
 
 Postgres holds the model and corpus registries, vocab, concepts, jobs, and search hits, all in the
@@ -79,21 +83,31 @@ it needs. The SQL migrations in `database/migration/` are the schema (no ORM): `
 bootstraps the database and roles on every start, and each file in `002_migration/` runs once.
 An applied file never changes; a fix is a new file.
 
-The API (FastAPI) is internal to the stack. To work on it, `task dev:up:api` runs it from source
-with hot reload and publishes it on `127.0.0.1:8000` only, with Swagger UI at
-<http://127.0.0.1:8000/docs>; `task up` returns to the unpublished default.
+The API (FastAPI) is reached only through web, under `/fastapi/`. To work on it,
+`task dev:up:api` runs it from source with hot reload, at the same address; `task up` returns to
+the built image.
 
 | Endpoint | What it does |
 |---|---|
-| `GET /health` | Postgres and Redis are reachable |
+| `GET /health` | the stack's health: API version and uptime, Postgres, Redis, and RabbitMQ (with queue depths and consumers), the workers that answer, and active jobs; `GET /health/live` is the instant liveness check |
 | `GET /models`, `GET /models/{id}` | registered models with their provenance |
 | `GET /models/{id}/terms?prefix=` | autocomplete, most frequent first (case-sensitive) |
-| `POST /models/{id}/concepts` | `{root, …params}` → `200 ready` (cached) or `202 pending` with a job id |
+| `POST /models/{id}/concepts` | `{root, …params}` → `200 ready` (cached) or `202 pending`, with the job that built or is building it (status, attempts, warnings, compute time) |
 | `GET /models/{id}/concepts?root=` | cached concepts for a root, without starting a job |
 | `GET /concepts/{id}` | the ranked concept table |
 | `GET /corpora` | registered corpora |
-| `POST /searches`, `GET /searches/{id}` | search with concepts; its job and ranked hits |
+| `POST /searches`, `GET /searches/{id}` | search with concepts; its job (status, attempts, warnings, compute time) and ranked hits |
 | `GET /jobs/{id}`, `GET /jobs/{id}/events` | a job's status, and its progress as Server-Sent Events |
+
+Two Celery workers run those jobs, each on its own queue so neither kind waits behind the other:
+`worker-cpu` builds concepts (queue `cpu`) with the models under `data/models/` and writes
+`data/concepts/`, and `worker-search` runs searches (queue `search`) over the corpora under
+`data/corpora/` and writes `data/searches/`; a search never loads a model. Each container runs
+one task at a time; `MSR_CPU_WORKERS` and `MSR_SEARCH_WORKERS` in `.env` set how many containers
+of each `task up` starts (default 1). A concept the `msr concept` CLI already built (same model,
+root, and parameters) is reused from its files. A job's attempts are counted in Postgres: a killed
+worker's job is redelivered and runs again, and a job fails for good after three attempts.
+`task dev:up:worker` runs both workers from source and restarts them when a `.py` file changes.
 
 Builder commands (see Building the Simple English model). Each runs `msr` in the builder
 container, and its `-native` twin runs the same command with uv; the arguments are the same.
@@ -105,7 +119,8 @@ task build:corpus         # msr corpus: raw data → a search corpus (build:corp
 task build:register -- model <id>   # register a built model (or: -- corpus <name>) in Postgres
 task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
 task dev:up               # start the stack with every compose-overrides/ dev override applied
-task dev:up:api           # just the API from source, hot reload, on 127.0.0.1:8000
+task dev:up:api           # just the API from source, hot reload (still at /fastapi/ through web)
+task dev:up:worker        # just the workers from source, restarted on code changes
 ```
 
 Personal tasks go in `taskfiles/udt.yml` (gitignored; start from `taskfiles/udt.sample.yml`) and

@@ -4,11 +4,12 @@ from fastapi import APIRouter, Query, Response
 
 from msr_api.dependencies import Connection, CorrelationId, Publisher, Settings
 from msr_api.schemas.concepts import ConceptRequest, ConceptStatus, ConceptSummary
+from msr_api.schemas.errors import NOT_FOUND, UNAVAILABLE, UNPROCESSABLE
 from msr_api.schemas.models import ModelDetail, ModelSummary, Term
 from msr_api.services import concepts, models
 from msr_db.registry import AsyncModelRepository, AsyncVocabRepository
 
-router = APIRouter(prefix="/models", tags=["models"])
+router = APIRouter(prefix="/models", tags=["models"], responses=NOT_FOUND | UNPROCESSABLE)
 
 
 @router.get("")
@@ -40,7 +41,11 @@ async def terms(
 @router.post(
     "/{model_id}/concepts",
     status_code=202,
-    responses={200: {"model": ConceptStatus, "description": "Cached: the concept is ready"}},
+    responses={
+        200: {"model": ConceptStatus, "description": "Cached: the concept is ready"},
+        202: {"description": "Pending: a job is building the concept"},
+        **UNAVAILABLE,
+    },
 )
 async def request_concept(
     conn: Connection,

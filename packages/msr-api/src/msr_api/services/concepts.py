@@ -28,13 +28,14 @@ from msr_api.schemas.concepts import (
     ConceptTerm,
     RootTerm,
 )
+from msr_api.schemas.jobs import Job
 from msr_api.services import jobs as job_service
 from msr_api.services.models import get_model
 from msr_api.services.publisher import TaskPublisher
 from msr_db.concepts import AsyncConceptRepository
 from msr_db.jobs import AsyncJobRepository
 from msr_db.registry import AsyncVocabRepository
-from msr_db.rows import ModelRow, VocabRow
+from msr_db.rows import JobRow, ModelRow, VocabRow
 
 # A lost race (the active job finished between our insert and our select) is retried this many
 # times; each retry normally ends at "cached".
@@ -59,8 +60,14 @@ def resolve_params(model: ModelRow, request: ConceptRequest) -> ConceptParams:
             code="refs_not_built",
             details={"built": sorted(built)},
         )
-    if "steps" in overrides:
-        return provisional
+    # A concept's walk must match its X′'s λ, and each strategy's X′ is walked once.
+    if "steps" in overrides and provisional.steps != built[refs]:
+        raise UnprocessableError(
+            f"model {model.model_id!r} has X′ for {refs!r} at λ = {built[refs]}, not "
+            f"{provisional.steps}",
+            code="steps_not_built",
+            details={"steps": built[refs]},
+        )
     return ConceptParams.model_validate({**overrides, "steps": built[refs]})
 
 
@@ -90,7 +97,11 @@ async def request_concept(
     for _ in range(_ATTEMPTS):
         cached = await concepts.find(model_id, root.term_idx, params_hash)
         if cached is not None:
-            return ConceptStatus(status="ready", concept_id=cached.concept_id)
+            return ConceptStatus(
+                status="ready",
+                concept_id=cached.concept_id,
+                job=await builder_job(conn, cached.job_id),
+            )
         job = await jobs.insert_concept(
             model_id, root.term_idx, params_hash, params.model_dump(mode="json"), correlation_id
         )
@@ -104,11 +115,23 @@ async def request_concept(
                 queue=settings.concept_queue,
                 correlation_id=correlation_id,
             )
-            return ConceptStatus(status="pending", job_id=job.job_id)
+            return pending(await jobs.get(job.job_id) or job)
         active = await jobs.active_concept(model_id, root.term_idx, params_hash)
         if active is not None:
-            return ConceptStatus(status="pending", job_id=active.job_id)
+            return pending(active)
     raise ServiceUnavailableError("the concept is changing state; try again", code="concept_busy")
+
+
+def pending(job: JobRow) -> ConceptStatus:
+    return ConceptStatus(status="pending", job_id=job.job_id, job=job_service.job_out(job))
+
+
+async def builder_job(conn: AsyncConnection[Any], job_id: UUID | None) -> Job | None:
+    """The job that built a concept, if it's recorded and still exists."""
+    if job_id is None:
+        return None
+    row = await AsyncJobRepository(conn).get(job_id)
+    return job_service.job_out(row) if row else None
 
 
 async def concepts_for_root(
@@ -123,6 +146,7 @@ async def concepts_for_root(
             params=r.params,
             params_hash=r.params_hash,
             created_at=r.created_at,
+            job_id=r.job_id,
         )
         for r in rows
     ]
@@ -144,6 +168,7 @@ async def get_concept(conn: AsyncConnection[Any], concept_id: UUID, *, limit: in
         params_hash=row.params_hash,
         created_at=row.created_at,
         term_count=len(row.term_idx),
+        job=await builder_job(conn, row.job_id),
         terms=[
             ConceptTerm(
                 rank=t.rank,

@@ -1,19 +1,18 @@
-"""API pieces that need no services: settings, logging config, parameter resolution, events."""
+"""API pieces that need no services: correlation ids, parameter resolution, events."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid7
 
 import pytest
 
 from msr.jobs.events import JOB_EVENT, ProgressEvent, ResultEvent, is_terminal, stream_key
-from msr_api.core.config import ApiSettings
 from msr_api.core.errors import UnprocessableError
-from msr_api.core.logging import parse_levels
 from msr_api.middleware.correlation_id import parse
 from msr_api.schemas.concepts import ConceptRequest
 from msr_api.services.concepts import resolve_params
 from msr_api.services.events import snapshot_event, terminal_event, valid_last_event_id
+from msr_api.services.jobs import compute_seconds
 from msr_db.rows import JobRow, ModelRow
 
 NOW = datetime(2026, 10, 26, tzinfo=UTC)
@@ -60,8 +59,8 @@ def job(**fields: Any) -> JobRow:
 def test_steps_default_to_the_models_walk_length() -> None:
     params = resolve_params(model({"degree-mean": 100}), ConceptRequest(root="cat"))
     assert params.steps == 100
-    explicit = resolve_params(model({"degree-mean": 100}), ConceptRequest(root="cat", steps=7))
-    assert explicit.steps == 7
+    explicit = resolve_params(model({"degree-mean": 100}), ConceptRequest(root="cat", steps=100))
+    assert explicit == params
     seeded = resolve_params(
         model({"degree-mean": 100, "random:7": 20}), ConceptRequest(root="cat", refs="random:7")
     )
@@ -72,22 +71,22 @@ def test_unbuilt_strategies_and_bad_values_are_unprocessable() -> None:
     with pytest.raises(UnprocessableError) as not_built:
         resolve_params(model({}), ConceptRequest(root="cat"))
     assert not_built.value.code == "refs_not_built"
+    with pytest.raises(UnprocessableError) as other_steps:
+        resolve_params(model({"degree-mean": 100}), ConceptRequest(root="cat", steps=7))
+    assert other_steps.value.code == "steps_not_built"
+    assert other_steps.value.details == {"steps": 100}
     with pytest.raises(UnprocessableError) as bad:
         resolve_params(model({"degree-mean": 10}), ConceptRequest(root="cat", trim_ratio=1.5))
     assert bad.value.code == "invalid_request"
 
 
-def test_log_level_overrides() -> None:
-    assert parse_levels(" kombu=info, psycopg=DEBUG ") == {"kombu": "INFO", "psycopg": "DEBUG"}
-    assert parse_levels("") == {}
-    with pytest.raises(ValueError, match="name=LEVEL"):
-        parse_levels("kombu")
-
-
-def test_broker_url_quotes_credentials_and_vhost() -> None:
-    settings = ApiSettings(broker_user="u@x", broker_password="p/w:", broker_vhost="msr")
-    assert settings.broker_url == "amqp://u%40x:p%2Fw%3A@rabbitmq:5672/msr"
-    assert ApiSettings(broker_vhost="/").broker_url.endswith(":5672/%2F")
+def test_compute_time_is_the_latest_attempts_run_time() -> None:
+    started = datetime(2026, 10, 26, 12, 0, 0, tzinfo=UTC)
+    assert compute_seconds(job()) is None  # not started
+    finished = job(started_at=started, finished_at=started + timedelta(seconds=7.5))
+    assert compute_seconds(finished) == 7.5
+    running = job(started_at=started)
+    assert compute_seconds(running, now=started + timedelta(seconds=3)) == 3.0
 
 
 def test_correlation_ids_must_be_uuids() -> None:

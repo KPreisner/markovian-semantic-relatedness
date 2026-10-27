@@ -2,13 +2,21 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from msr_api.schemas import Schema
 from msr_api.schemas.jobs import Job
 
 
 class SearchRequest(Schema):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"concept_ids": ["01a17a3a-3769-7e56-8f8c-5589890d593c"], "corpus": "ccnews-en"}
+            ]
+        }
+    )
+
     concept_ids: list[UUID] = Field(
         min_length=1,
         max_length=10,
@@ -23,6 +31,7 @@ class SearchStarted(Schema):
     status: str = "pending"
     search_id: UUID
     job_id: UUID
+    job: Job = Field(description="The search's job: status, attempts, warnings, compute time")
 
 
 class Match(Schema):

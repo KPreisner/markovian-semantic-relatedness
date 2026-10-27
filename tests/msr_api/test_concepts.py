@@ -6,6 +6,7 @@ from uuid import UUID
 import httpx
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
 from msr.concept.storage import concept_key
 from msr.jobs.tasks import CONCEPT_TASK, CPU_QUEUE
@@ -31,6 +32,13 @@ def test_a_new_concept_queues_one_job(client: httpx.Client, api: RunningApi) -> 
     assert response.status_code == 202
     body = response.json()
     assert body["status"] == "pending" and body["concept_id"] is None
+    assert body["job"]["job_id"] == body["job_id"]
+    assert (body["job"]["status"], body["job"]["attempts"], body["job"]["warnings"]) == (
+        "queued",
+        0,
+        [],
+    )
+    assert body["job"]["compute_seconds"] is None
     row = job(api, body["job_id"])
     assert (row["job_type"], row["status"], row["root_idx"]) == ("concept", "queued", 3)
     assert row["params_hash"] == concept_key(default_params())
@@ -78,8 +86,55 @@ def test_a_cached_concept_is_ready_without_a_job(client: httpx.Client, api: Runn
     concept_id = insert_concept(api.database, "lost", default_params())
     response = client.post(URL, json={"root": "lost"})
     assert response.status_code == 200
-    assert response.json() == {"status": "ready", "concept_id": str(concept_id), "job_id": None}
+    assert response.json() == {
+        "status": "ready",
+        "concept_id": str(concept_id),
+        "job_id": None,
+        "job": None,  # stored without a job
+    }
     assert api.publisher.calls == []
+
+
+def built_concept(api: RunningApi, root: str) -> tuple[UUID, UUID]:
+    """A concept built by a job that needed two attempts and ran 7.5 s the second time.
+    Returns (concept id, job id)."""
+    with psycopg.connect(api.database.conninfo("owner")) as conn:
+        row = conn.execute(
+            "INSERT INTO msr.jobs (job_type, status, model_id, root_idx, params_hash, params, "
+            "attempts, warnings, result_id, created_at, started_at, finished_at) "
+            "VALUES ('concept', 'succeeded', %s, %s, %s, %s, 2, %s, uuidv7(), "
+            "'2026-10-26 12:00:00Z', '2026-10-26 12:01:00Z', '2026-10-26 12:01:07.5Z') "
+            "RETURNING job_id",
+            (
+                MODEL_ID,
+                toy.VOCAB.index(root),
+                concept_key(default_params()),
+                Jsonb(default_params().model_dump(mode="json")),
+                ["attempt 1 failed (internal_error); retrying", "attempt 2 started"],
+            ),
+        ).fetchone()
+    assert row is not None
+    job_id: UUID = row[0]
+    concept_id = insert_concept(api.database, root, default_params(), job_id=job_id)
+    with psycopg.connect(api.database.conninfo("owner")) as conn:
+        conn.execute("UPDATE msr.jobs SET result_id = %s WHERE job_id = %s", (concept_id, job_id))
+    return concept_id, job_id
+
+
+def test_a_cached_concept_reports_the_job_that_built_it(
+    client: httpx.Client, api: RunningApi
+) -> None:
+    concept_id, job_id = built_concept(api, "wild")
+    ready = client.post(URL, json={"root": "wild"})
+    assert ready.status_code == 200
+    built = ready.json()["job"]
+    assert (built["job_id"], built["status"], built["attempts"]) == (str(job_id), "succeeded", 2)
+    assert built["compute_seconds"] == 7.5
+    assert built["warnings"] == ["attempt 1 failed (internal_error); retrying", "attempt 2 started"]
+    assert built["error"] is None and built["result_id"] == str(concept_id)
+    assert client.get(f"/concepts/{concept_id}").json()["job"] == built
+    listed = client.get(URL, params={"root": "wild"}).json()
+    assert [c["job_id"] for c in listed] == [str(job_id)]
 
 
 def test_unknown_roots_models_and_strategies(client: httpx.Client) -> None:

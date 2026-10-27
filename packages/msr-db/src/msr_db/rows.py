@@ -53,6 +53,8 @@ class ConceptRow:
     weight: list[float]
     cooccur: list[int]
     created_at: datetime
+    job_id: UUID | None
+    """The job that built it."""
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,7 @@ class ConceptSummaryRow:
     params: dict[str, Any]
     params_hash: str
     created_at: datetime
+    job_id: UUID | None
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,13 @@ class JobRow:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+
+
+@dataclass(frozen=True)
+class JobCountsRow:
+    queued: int
+    running: int
+    oldest_queued_seconds: float | None
 
 
 @dataclass(frozen=True)

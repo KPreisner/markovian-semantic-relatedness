@@ -67,7 +67,10 @@ async def create_search(
         queue=settings.search_queue,
         correlation_id=correlation_id,
     )
-    return SearchStarted(search_id=search.search_id, job_id=job.job_id)
+    queued = await AsyncJobRepository(conn).get(job.job_id) or job
+    return SearchStarted(
+        search_id=search.search_id, job_id=job.job_id, job=job_service.job_out(queued)
+    )
 
 
 async def get_search(conn: AsyncConnection[Any], search_id: UUID, *, limit: int) -> Search:

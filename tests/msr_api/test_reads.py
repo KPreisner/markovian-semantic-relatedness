@@ -10,10 +10,14 @@ from tests.fixtures.api import CORPUS_ID, MODEL_ID, STEPS
 pytestmark = pytest.mark.integration
 
 
-def test_health(client: httpx.Client) -> None:
+def test_health_against_the_stacks_broker(client: httpx.Client) -> None:
+    """The real broker monitor; which workers answer depends on the stack, so only the shape."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "checks": {"postgres": "ok", "redis": "ok"}}
+    body = response.json()
+    assert body["status"] in ("ok", "degraded")
+    assert [q["name"] for q in body["broker"]["queues"]] == ["cpu", "gpu", "search"]
+    assert body["workers"]["count"] == len(body["workers"]["nodes"])
 
 
 def test_models_list_a_provenance_summary(client: httpx.Client) -> None:
@@ -61,10 +65,10 @@ def test_corpora(client: httpx.Client) -> None:
 
 
 def test_a_correlation_id_is_generated_or_kept(client: httpx.Client) -> None:
-    generated = UUID(client.get("/health").headers["X-Correlation-ID"])
+    generated = UUID(client.get("/health/live").headers["X-Correlation-ID"])
     assert generated.version == 7
     mine = "0192f0c5-7e1a-7c3b-9d2e-3f4a5b6c7d8e"
-    response = client.get("/health", headers={"X-Correlation-ID": mine})
+    response = client.get("/health/live", headers={"X-Correlation-ID": mine})
     assert response.headers["X-Correlation-ID"] == mine
-    bad = client.get("/health", headers={"X-Correlation-ID": "not-a-uuid"})
+    bad = client.get("/health/live", headers={"X-Correlation-ID": "not-a-uuid"})
     assert UUID(bad.headers["X-Correlation-ID"]).version == 7

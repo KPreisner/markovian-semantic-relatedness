@@ -2,14 +2,19 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from msr_api.schemas import Schema
+from msr_api.schemas.jobs import Job
 
 
 class ConceptRequest(Schema):
     """A root term plus any concept parameters to override. Omitted parameters take their
     defaults; `steps` defaults to the λ the model's X′ was walked with for `refs`."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"root": "trumpet"}, {"root": "trumpet", "threshold": 4.0}]}
+    )
 
     root: str = Field(min_length=1, description="The root term, matched case-sensitively")
     refs: str | None = Field(None, description="Reference strategy, e.g. `degree-mean`")
@@ -22,11 +27,17 @@ class ConceptRequest(Schema):
 
 
 class ConceptStatus(Schema):
-    """`ready` with a `concept_id` (cached), or `pending` with the `job_id` building it."""
+    """`ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is
+    that job in full: its status, attempts, warnings, error, and compute time."""
 
     status: Literal["ready", "pending"]
     concept_id: UUID | None = None
     job_id: UUID | None = None
+    job: Job | None = Field(
+        None,
+        description="The job building the concept, or the one that built it (null for a concept "
+        "stored without a job)",
+    )
 
 
 class ConceptTerm(Schema):
@@ -48,6 +59,7 @@ class ConceptSummary(Schema):
     params: dict[str, Any]
     params_hash: str
     created_at: datetime
+    job_id: UUID | None = Field(description="The job that built it (`GET /jobs/{job_id}`)")
 
 
 class Concept(Schema):
@@ -58,4 +70,7 @@ class Concept(Schema):
     params_hash: str
     created_at: datetime
     term_count: int = Field(description="Ranked terms stored")
+    job: Job | None = Field(
+        description="The job that built it: attempts, warnings, compute time (null if none)"
+    )
     terms: list[ConceptTerm]

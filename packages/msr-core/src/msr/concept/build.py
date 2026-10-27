@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field
 
+from msr.concept.errors import NoConceptError
 from msr.concept.ranking import rank_terms, scale
 from msr.concept.zscore import negated_z, trim_count, trimmed_stats
 from msr.model.build import Model
@@ -73,7 +74,7 @@ def reference_columns(
         nodes = select_references(model, component, q + 1, references.strategy)
         xprime = hitting_times(model, nodes.tolist(), steps=references.steps, backend=backend)
     if len(nodes) < 2:
-        raise ValueError(f"term {root} is alone in its component; it has no concept")
+        raise NoConceptError(f"term {root} is alone in its component; it has no concept")
     hit = np.flatnonzero(nodes == root)
     drop = int(hit[0]) if len(hit) else len(nodes) - 1
     keep = np.delete(np.arange(len(nodes)), drop)

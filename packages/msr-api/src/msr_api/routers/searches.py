@@ -4,13 +4,14 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from msr_api.dependencies import Connection, CorrelationId, Publisher, Settings
+from msr_api.schemas.errors import NOT_FOUND, UNAVAILABLE, UNPROCESSABLE
 from msr_api.schemas.searches import Search, SearchRequest, SearchStarted
 from msr_api.services import searches
 
-router = APIRouter(prefix="/searches", tags=["searches"])
+router = APIRouter(prefix="/searches", tags=["searches"], responses=NOT_FOUND | UNPROCESSABLE)
 
 
-@router.post("", status_code=202)
+@router.post("", status_code=202, responses=UNAVAILABLE)
 async def create_search(
     conn: Connection,
     publisher: Publisher,

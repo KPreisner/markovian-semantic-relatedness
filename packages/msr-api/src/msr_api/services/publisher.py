@@ -34,6 +34,9 @@ def celery_app(settings: ApiSettings, queues: tuple[str, ...] = QUEUES) -> Celer
         task_create_missing_queues=False,
         task_ignore_result=True,
         broker_transport_options={"confirm_publish": True},
+        # The health report pings workers; RabbitMQ 4 refuses Celery's default (transient,
+        # non-exclusive) reply queue.
+        control_queue_exclusive=True,
         broker_connection_timeout=5,
     )
     return app

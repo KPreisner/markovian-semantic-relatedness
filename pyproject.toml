@@ -19,6 +19,7 @@ dev = [
     "pyarrow-stubs>=20.0",
     "httpx>=0.28.1",
     "celery-types>=0.26.0",
+    "watchdog>=6.0.0",
 ]
 
 [tool.uv]
@@ -56,8 +57,12 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Integration tests need the compose Postgres and run in the `test` container
-# (`task py:test:integration`, which passes `-m integration` and so overrides this default).
-addopts = ["-m", "not integration"]
-markers = ["integration: needs the compose stack (task py:test:integration)"]
+# (`task py:test:integration`, which passes `-m integration` and so overrides this default). The
+# smoke test runs the whole stack in its own Compose project from the host (`task smoke`).
+addopts = ["-m", "not integration and not smoke"]
+markers = [
+    "integration: needs the compose stack (task py:test:integration)",
+    "smoke: runs the whole stack in Docker Compose from the host (task smoke)",
+]
 # fastwarc warns about its own legacy shims on import.
 filterwarnings = ["ignore::DeprecationWarning:fastwarc.legacy._shims"]

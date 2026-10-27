@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -29,7 +30,16 @@ def job_out(row: JobRow) -> Job:
         created_at=row.created_at,
         started_at=row.started_at,
         finished_at=row.finished_at,
+        compute_seconds=compute_seconds(row),
     )
+
+
+def compute_seconds(row: JobRow, now: datetime | None = None) -> float | None:
+    """The latest attempt's run time: started → finished, or started → now while it runs."""
+    if row.started_at is None:
+        return None
+    end = row.finished_at or (now or datetime.now(UTC))
+    return round(max((end - row.started_at).total_seconds(), 0.0), 3)
 
 
 async def get_job(conn: AsyncConnection[Any], job_id: UUID) -> JobRow:

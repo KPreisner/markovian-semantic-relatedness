@@ -12,6 +12,8 @@ dependencies = [
     "pyarrow>=26.0",
     "pyahocorasick>=2.3",
     "orjson>=3.13",
+    "structlog>=26.1.0",
+    "pydantic-settings>=2.16.1",
 ]
 
 [build-system]

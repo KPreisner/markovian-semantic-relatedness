@@ -4,6 +4,7 @@ The lifespan opens the Postgres pool (as the `api` role), the Redis client, and 
 and puts them on `app.state` for the dependencies.
 """
 
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -15,24 +16,54 @@ from psycopg_pool import AsyncConnectionPool
 from redis.asyncio import Redis
 
 import msr
+from msr.service.logging import configure_logging
 from msr_api.core import errors
 from msr_api.core.config import ApiSettings
-from msr_api.core.logging import configure_logging
 from msr_api.middleware.correlation_id import CorrelationIdMiddleware
 from msr_api.middleware.response_logging import ResponseLoggingMiddleware
 from msr_api.routers import concepts, corpora, health, jobs, models, searches
+from msr_api.services.broker import BrokerMonitor, CeleryMonitor
 from msr_api.services.publisher import CeleryPublisher, TaskPublisher, celery_app
 from msr_db.settings import DatabaseSettings
 
 log = structlog.get_logger(__name__)
+
+DESCRIPTION = """\
+Concepts and ranked semantic search over co-occurrence models
+([Markovian Semantic Relatedness](https://github.com/KPreisner/markovian-semantic-relatedness)).
+
+**How a request flows**
+1. Pick a model (`GET /models`) and a root term (`GET /models/{model_id}/terms?prefix=`).
+2. `POST /models/{model_id}/concepts`: `200 ready` with a `concept_id` if it's cached, otherwise
+   `202 pending` with the `job_id` building it. Identical requests share one job.
+3. Follow the job: `GET /jobs/{job_id}/events` streams its progress as Server-Sent Events and
+   ends with `result` (or `error`); `GET /jobs/{job_id}` is the same state for polling.
+4. `GET /concepts/{concept_id}` is the ranked table. `POST /searches` with one or more concepts
+   and a corpus (`GET /corpora`) starts a search job the same way; `GET /searches/{search_id}`
+   has its hits.
+
+Terms are case-sensitive. Every error has one shape: `{"error": {"code", "message", "details"?}}`.
+Send `X-Correlation-ID` (a UUID) to trace a request through the logs; the response echoes it.
+"""
+
+TAGS = [
+    {"name": "models", "description": "Registered models, term autocomplete, concept requests"},
+    {"name": "concepts", "description": "Cached concept tables"},
+    {"name": "corpora", "description": "Registered search corpora"},
+    {"name": "searches", "description": "Search jobs and their ranked hits"},
+    {"name": "jobs", "description": "Job status and progress (Server-Sent Events)"},
+    {"name": "health", "description": "Liveness of Postgres and Redis"},
+]
 
 
 def create_app(
     settings: ApiSettings | None = None,
     database: DatabaseSettings | None = None,
     publisher: TaskPublisher | None = None,
+    monitor: BrokerMonitor | None = None,
 ) -> FastAPI:
-    """`database` and `publisher` default to the environment's; tests pass their own."""
+    """`database`, `publisher`, and `monitor` default to the environment's; tests pass their
+    own."""
     settings = settings or ApiSettings()
     configure_logging(settings.log_level, settings.log_format, settings.log_levels)
 
@@ -53,20 +84,26 @@ def create_app(
             decode_responses=True,
             socket_timeout=settings.sse_block_ms / 1000 + 5,
         )
+        broker = celery_app(settings)
+        app.state.started = time.monotonic()
         app.state.settings = settings
         app.state.pool = pool
         app.state.redis = redis
-        app.state.publisher = publisher or CeleryPublisher(celery_app(settings))
+        app.state.publisher = publisher or CeleryPublisher(broker)
+        app.state.monitor = monitor or CeleryMonitor(broker)
         log.info("api_started", database=db.name, user=db.user("api"))
         try:
             yield
         finally:
             await redis.aclose()
             await pool.close()
+            broker.close()
 
     app = FastAPI(
         title="Markovian Semantic Relatedness API",
         version=msr.__version__,
+        description=DESCRIPTION,
+        openapi_tags=TAGS,
         lifespan=lifespan,
     )
     errors.install(app)
