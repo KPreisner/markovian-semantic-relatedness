@@ -100,6 +100,7 @@ web is the Next.js app (`web/`), the UI at <http://127.0.0.1:3000>:
 | `/jobs/{id}` | a concept job's live progress; opens the concept when it's done |
 | `/concepts/{id}` | the ranked concept table, with weights, co-occurrence, counts, and how it was built |
 | `/search` | one or more concepts of a model (building any that are missing), a corpus, and whole-word or inside-word matching |
+| `/searches` | every search run, plus those still running or failed, filterable by status, model, corpus, and term; running ones update live |
 | `/searches/{id}` | the scan's live progress, then ranked paragraphs with matches colored by concept |
 | `/health` | the stack's health, refreshed every 5 s |
 
@@ -124,6 +125,7 @@ the built image.
 | `GET /concepts` | the concepts index: stored concepts and queued, running, or failed concept jobs, newest first (`?model=`, `?term=`, `?status=`, `limit`, `offset`), with counts per status |
 | `GET /concepts/{id}` | the ranked concept table |
 | `GET /corpora` | registered corpora |
+| `GET /searches` | the searches index: every search with its concepts, latest job, and stored hit count, newest first (`?model=`, `?corpus=`, `?term=`, `?status=`, `limit`, `offset`), with counts per status |
 | `POST /searches`, `GET /searches/{id}` | search with concepts; its job (status, attempts, warnings, compute time) and ranked hits |
 | `GET /jobs/{id}`, `GET /jobs/{id}/events` | a job's status, and its progress as Server-Sent Events |
 

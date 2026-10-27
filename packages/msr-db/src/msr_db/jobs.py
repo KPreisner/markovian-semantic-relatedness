@@ -43,6 +43,7 @@ JOB_INSERT_SEARCH = """
     VALUES ('search', %s, %s, %s)
     RETURNING *
 """
+# Served by ix_jobs_search_id.
 JOB_FOR_SEARCH = """
     SELECT * FROM msr.jobs
     WHERE job_type = 'search' AND params->>'search_id' = %s

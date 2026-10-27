@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/site/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { zListConceptsResponse, zListModelsResponse } from "@/lib/api/zod.gen";
-import { apiQuery, parseFilters } from "@/lib/concept-index";
+import { CONCEPT_INDEX } from "@/lib/index-filters";
 import { load } from "@/lib/server/data";
 
 export const metadata: Metadata = { title: "Concepts" };
@@ -47,9 +47,9 @@ async function IndexContent({
 }: {
   searchParams: PageProps<"/concepts">["searchParams"];
 }) {
-  const filters = parseFilters(await searchParams);
+  const filters = CONCEPT_INDEX.parse(await searchParams);
   const [index, models] = await Promise.all([
-    load("/concepts", zListConceptsResponse, apiQuery(filters)),
+    load("/concepts", zListConceptsResponse, CONCEPT_INDEX.apiQuery(filters)),
     load("/models", zListModelsResponse),
   ]);
   return <ConceptIndexView index={index} models={models} filters={filters} />;

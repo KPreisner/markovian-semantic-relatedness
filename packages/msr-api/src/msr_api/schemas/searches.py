@@ -57,6 +57,42 @@ class SearchHit(Schema):
     score: float
 
 
+type JobStatus = Literal["queued", "running", "succeeded", "failed"]
+
+
+class SearchConceptRef(Schema):
+    concept_id: UUID
+    root: str | None = Field(description="The concept's chosen term (null if it was deleted)")
+    params: dict[str, Any] | None = Field(description="The concept's parameters (null if deleted)")
+
+
+class SearchEntry(Schema):
+    search_id: UUID
+    model_id: str
+    corpus_id: str
+    concepts: list[SearchConceptRef] = Field(description="In the search's order")
+    params: dict[str, Any]
+    created_at: datetime
+    status: JobStatus = Field(description="The latest job's status")
+    hit_count: int = Field(description="Hits stored (the top N)")
+    job: Job
+
+
+class SearchIndexCounts(Schema):
+    queued: int
+    running: int
+    succeeded: int
+    failed: int
+
+
+class SearchIndex(Schema):
+    entries: list[SearchEntry] = Field(description="Newest first")
+    counts: SearchIndexCounts = Field(
+        description="Searches with each status under the model, corpus, and term filters "
+        "(not `status`)"
+    )
+
+
 class Search(Schema):
     search_id: UUID
     model_id: str

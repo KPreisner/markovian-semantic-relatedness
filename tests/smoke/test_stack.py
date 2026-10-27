@@ -197,6 +197,7 @@ def test_the_ui_pages_render_the_results(stack: Stack) -> None:
     old = httpx.get(f"{stack.web}/workbench", timeout=60)
     assert (old.status_code, old.headers["location"]) == (308, "/concepts/new")
     assert CORPUS_ID in page(f"/search?concepts={concept_id}")
+    assert f"/searches/{search_id}" in page("/searches")
     concept = page(f"/concepts/{concept_id}")
     assert ">cat<" in concept and "hat" in concept
     results = page(f"/searches/{search_id}")

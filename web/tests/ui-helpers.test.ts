@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { readRecent, rememberConcept } from "@/lib/client/recent";
-import { apiQuery, indexHref, pageCount, parseFilters, tabCount } from "@/lib/concept-index";
+import { CONCEPT_INDEX, SEARCH_INDEX } from "@/lib/index-filters";
 import {
   formatBytes,
   formatSeconds,
@@ -93,51 +93,59 @@ describe("match strength", () => {
   });
 });
 
-describe("concepts index filters", () => {
+describe("index filters", () => {
   const counts = { ready: 120, queued: 1, running: 2, failed: 3 };
+  const none = { tab: "all", term: "", model: "", corpus: "", page: 1 };
 
   it("reads the URL, falling back to defaults for anything unknown", () => {
-    expect(parseFilters({})).toEqual({ tab: "all", term: "", model: "", page: 1 });
-    expect(parseFilters({ tab: "failed", term: " cat ", model: "m", page: "3" })).toEqual({
-      tab: "failed",
-      term: "cat",
-      model: "m",
-      page: 3,
+    expect(CONCEPT_INDEX.parse({})).toEqual(none);
+    expect(
+      SEARCH_INDEX.parse({ tab: "failed", term: " cat ", model: "m", corpus: "c", page: "3" }),
+    ).toEqual({ tab: "failed", term: "cat", model: "m", corpus: "c", page: 3 });
+    expect(CONCEPT_INDEX.parse({ tab: "bogus", page: "-2" })).toMatchObject({
+      tab: "all",
+      page: 1,
     });
-    expect(parseFilters({ tab: "bogus", page: "-2" })).toMatchObject({ tab: "all", page: 1 });
-    expect(parseFilters({ tab: ["built", "failed"], page: "x" })).toMatchObject({
+    expect(CONCEPT_INDEX.parse({ tab: ["built", "failed"], page: "x" })).toMatchObject({
       tab: "built",
       page: 1,
     });
+    // Each index has its own tabs.
+    expect(SEARCH_INDEX.parse({ tab: "built" }).tab).toBe("all");
   });
 
   it("asks the API for the tab's statuses and the page's rows", () => {
-    const filters = { tab: "building", term: "", model: "", page: 2 } as const;
-    expect(apiQuery(filters)).toEqual({
+    expect(CONCEPT_INDEX.apiQuery({ ...none, tab: "building", page: 2 })).toEqual({
       status: ["queued", "running"],
       term: undefined,
       model: undefined,
+      corpus: undefined,
       limit: 50,
       offset: 50,
     });
-    expect(apiQuery({ ...filters, tab: "all" }).status).toBeUndefined();
+    expect(SEARCH_INDEX.apiQuery({ ...none, tab: "done", corpus: "c" })).toMatchObject({
+      status: ["succeeded"],
+      corpus: "c",
+    });
+    expect(CONCEPT_INDEX.apiQuery(none).status).toBeUndefined();
   });
 
   it("writes the URL back without defaults", () => {
-    expect(indexHref({ tab: "all", term: "", model: "", page: 1 })).toBe("/concepts");
-    expect(indexHref({ tab: "failed", term: "Ron W", model: "", page: 2 })).toBe(
+    expect(CONCEPT_INDEX.href(none)).toBe("/concepts");
+    expect(CONCEPT_INDEX.href({ ...none, tab: "failed", term: "Ron W", page: 2 })).toBe(
       "/concepts?tab=failed&term=Ron+W&page=2",
     );
+    expect(SEARCH_INDEX.href({ ...none, corpus: "ccnews-en" })).toBe("/searches?corpus=ccnews-en");
   });
 
   it("counts each tab and its pages", () => {
-    expect(tabCount("all", counts)).toBe(126);
-    expect(tabCount("building", counts)).toBe(3);
-    expect(pageCount({ tab: "built", term: "", model: "", page: 1 }, counts)).toBe(3);
-    expect(pageCount({ tab: "failed", term: "", model: "", page: 1 }, counts)).toBe(1);
-    expect(
-      pageCount({ tab: "failed", term: "", model: "", page: 1 }, { ...counts, failed: 0 }),
-    ).toBe(1);
+    expect(CONCEPT_INDEX.tabCount("all", counts)).toBe(126);
+    expect(CONCEPT_INDEX.tabCount("building", counts)).toBe(3);
+    expect(CONCEPT_INDEX.pageCount({ ...none, tab: "built" }, counts)).toBe(3);
+    expect(CONCEPT_INDEX.pageCount({ ...none, tab: "failed" }, { ...counts, failed: 0 })).toBe(1);
+    expect(SEARCH_INDEX.tabCount("done", { queued: 0, running: 1, succeeded: 4, failed: 2 })).toBe(
+      4,
+    );
   });
 });
 

@@ -571,6 +571,8 @@ export type JobEvent = ({
  */
 export type JobEventData = JobEvent;
 
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
 /**
  * JobsInfo
  */
@@ -894,6 +896,75 @@ export type Search = {
 };
 
 /**
+ * SearchConceptRef
+ */
+export type SearchConceptRef = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Params
+     *
+     * The concept's parameters (null if deleted)
+     */
+    params: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Root
+     *
+     * The concept's chosen term (null if it was deleted)
+     */
+    root: string | null;
+};
+
+/**
+ * SearchEntry
+ */
+export type SearchEntry = {
+    /**
+     * Concepts
+     *
+     * In the search's order
+     */
+    concepts: Array<SearchConceptRef>;
+    /**
+     * Corpus Id
+     */
+    corpus_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Hit Count
+     *
+     * Hits stored (the top N)
+     */
+    hit_count: number;
+    job: Job;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: unknown;
+    };
+    /**
+     * Search Id
+     */
+    search_id: string;
+    /**
+     * The latest job's status
+     */
+    status: JobStatus;
+};
+
+/**
  * SearchHit
  */
 export type SearchHit = {
@@ -933,6 +1004,44 @@ export type SearchHit = {
      * Score
      */
     score: number;
+};
+
+/**
+ * SearchIndex
+ */
+export type SearchIndex = {
+    /**
+     * Searches with each status under the model, corpus, and term filters (not `status`)
+     */
+    counts: SearchIndexCounts;
+    /**
+     * Entries
+     *
+     * Newest first
+     */
+    entries: Array<SearchEntry>;
+};
+
+/**
+ * SearchIndexCounts
+ */
+export type SearchIndexCounts = {
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Running
+     */
+    running: number;
+    /**
+     * Succeeded
+     */
+    succeeded: number;
 };
 
 /**
@@ -1455,6 +1564,68 @@ export type TermsResponses = {
 };
 
 export type TermsResponse = TermsResponses[keyof TermsResponses];
+
+export type ListSearchesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Model
+         *
+         * Only this model's
+         */
+        model?: string | null;
+        /**
+         * Corpus
+         *
+         * Only this corpus's
+         */
+        corpus?: string | null;
+        /**
+         * Term
+         *
+         * Searches with a concept whose chosen term contains this, in any case
+         */
+        term?: string | null;
+        /**
+         * Status
+         *
+         * Only these statuses
+         */
+        status?: Array<JobStatus> | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/searches';
+};
+
+export type ListSearchesErrors = {
+    /**
+     * No such model, term, concept, corpus, search, or job
+     */
+    404: ErrorResponse;
+    /**
+     * Invalid request or parameters
+     */
+    422: ErrorResponse;
+};
+
+export type ListSearchesError = ListSearchesErrors[keyof ListSearchesErrors];
+
+export type ListSearchesResponses = {
+    /**
+     * Successful Response
+     */
+    200: SearchIndex;
+};
+
+export type ListSearchesResponse = ListSearchesResponses[keyof ListSearchesResponses];
 
 export type CreateSearchData = {
     body: SearchRequest;

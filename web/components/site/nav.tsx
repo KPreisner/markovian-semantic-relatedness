@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Logo } from "@/components/site/logo";
 
 const LINKS = [
-  { href: "/concepts", label: "Concepts" },
+  { href: "/concepts/new", label: "Concepts" },
   { href: "/search", label: "Search" },
   { href: "/health", label: "Health" },
 ];

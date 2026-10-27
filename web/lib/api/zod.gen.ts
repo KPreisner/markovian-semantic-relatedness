@@ -129,6 +129,13 @@ export const zJobError = z.object({
     message: z.string().nullable()
 });
 
+export const zJobStatus = z.enum([
+    'queued',
+    'running',
+    'succeeded',
+    'failed'
+]);
+
 /**
  * JobsInfo
  */
@@ -336,6 +343,30 @@ export const zConceptStatus = z.object({
 });
 
 /**
+ * SearchConceptRef
+ */
+export const zSearchConceptRef = z.object({
+    concept_id: z.uuid(),
+    params: z.record(z.string(), z.unknown()).nullable(),
+    root: z.string().nullable()
+});
+
+/**
+ * SearchEntry
+ */
+export const zSearchEntry = z.object({
+    concepts: z.array(zSearchConceptRef),
+    corpus_id: z.string(),
+    created_at: z.iso.datetime({ offset: true }),
+    hit_count: z.int(),
+    job: zJob,
+    model_id: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    search_id: z.uuid(),
+    status: zJobStatus
+});
+
+/**
  * SearchHit
  */
 export const zSearchHit = z.object({
@@ -362,6 +393,24 @@ export const zSearch = z.object({
     model_id: z.string(),
     params: z.record(z.string(), z.unknown()),
     search_id: z.uuid()
+});
+
+/**
+ * SearchIndexCounts
+ */
+export const zSearchIndexCounts = z.object({
+    failed: z.int(),
+    queued: z.int(),
+    running: z.int(),
+    succeeded: z.int()
+});
+
+/**
+ * SearchIndex
+ */
+export const zSearchIndex = z.object({
+    counts: zSearchIndexCounts,
+    entries: z.array(zSearchEntry)
 });
 
 /**
@@ -547,6 +596,20 @@ export const zTermsQuery = z.object({
  * Successful Response
  */
 export const zTermsResponse = z.array(zTerm);
+
+export const zListSearchesQuery = z.object({
+    model: z.string().min(1).nullish(),
+    corpus: z.string().min(1).nullish(),
+    term: z.string().min(1).max(200).nullish(),
+    status: z.array(zJobStatus).nullish(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    offset: z.int().gte(0).optional().default(0)
+});
+
+/**
+ * Successful Response
+ */
+export const zListSearchesResponse = zSearchIndex;
 
 export const zCreateSearchBody = zSearchRequest;
 
