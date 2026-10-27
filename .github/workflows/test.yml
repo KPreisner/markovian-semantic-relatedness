@@ -15,6 +15,22 @@ jobs:
       - name: pytest
         run: uv run pytest
 
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: vitest
+        run: npm test
+
   # The integration tests against Postgres, RabbitMQ, and Redis as service containers on
   # localhost (locally they run in the compose `test` container instead). The services' settings
   # match .env.static, which the tests read.

@@ -188,6 +188,8 @@ def read_events(
     ):
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
+        # Proxies (Next's /fastapi rewrite) mustn't compress, or every event waits for the end.
+        assert "no-transform" in response.headers["cache-control"]
         entry_id: str | None = None
         data: list[str] = []
         for line in response.iter_lines():

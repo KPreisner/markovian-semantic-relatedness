@@ -1,0 +1,5 @@
+# Generated from the API's OpenAPI schema (task web:typegen).
+lib/api/
+openapi.json
+.next/
+node_modules/

@@ -42,7 +42,8 @@ Tests live in `tests/<import name>/`.
 ## Development
 
 Requires [uv](https://docs.astral.sh/uv/) and [Task](https://taskfile.dev), plus Docker with
-Compose for the stack and the builder container. The tasks live in `taskfiles/` (one module per
+Compose for the stack and the builder container. Node isn't needed on the host: the web tasks run
+npm in a container, with `node_modules` in a Docker volume. The tasks live in `taskfiles/` (one module per
 area); `task` with no arguments lists them all. Extra arguments go after `--`.
 
 ```bash
@@ -53,7 +54,13 @@ task py:format            # auto-format and apply safe lint fixes (alias: task p
 task py:test              # pytest, e.g. task py:test -- -k walk (alias: task py-test)
 task py:test:integration  # integration tests in the compose `test` container, against scratch databases
 task smoke                # end-to-end: the whole stack in its own Compose project, toy model → concept → search
-task check                # lint, typecheck, and test (py:check); task py-lint is lint + typecheck, as in CI
+task web:install          # npm ci into the node_modules volume (first time, and after package-lock.json changes)
+task web:lint             # ESLint and Prettier --check (task web:format fixes formatting)
+task web:typecheck        # tsc, with Next's route types
+task web:test             # Vitest: the BFF's API client, route handlers, and SSE relay
+task web:typegen          # regenerate web/openapi.json and the BFF's types and Zod schemas from the API
+task web:npm -- <args>    # npm in web/, e.g. task web:npm -- install <package>
+task check                # lint, typecheck, and test, Python and web; task py-lint is lint + typecheck, as in CI
 task msr -- <args>        # run the msr CLI natively, e.g. task msr -- concept trumpet --model <id>
 ```
 
@@ -82,6 +89,12 @@ Postgres holds the model and corpus registries, vocab, concepts, jobs, and searc
 it needs. The SQL migrations in `database/migration/` are the schema (no ORM): `001_postgres/`
 bootstraps the database and roles on every start, and each file in `002_migration/` runs once.
 An applied file never changes; a fix is a new file.
+
+web is the Next.js app (`web/`). The UI calls only its own `/api/*` route handlers (the BFF),
+which call FastAPI inside the stack, validate every response with Zod schemas generated from the
+API's OpenAPI schema, and relay job progress as Server-Sent Events. After changing the API's
+schemas, run `task web:typegen`; CI fails if the generated files are stale. `task dev:up:web` runs
+the web app with `next dev` and hot reload.
 
 The API (FastAPI) is reached only through web, under `/fastapi/`. To work on it,
 `task dev:up:api` runs it from source with hot reload, at the same address; `task up` returns to
@@ -119,6 +132,7 @@ task build:corpus         # msr corpus: raw data → a search corpus (build:corp
 task build:register -- model <id>   # register a built model (or: -- corpus <name>) in Postgres
 task dev:builder -- <args>  # msr in the builder, from source (the develop image with packages/ mounted)
 task dev:up               # start the stack with every compose-overrides/ dev override applied
+task dev:up:web           # just the web app with next dev and hot reload
 task dev:up:api           # just the API from source, hot reload (still at /fastapi/ through web)
 task dev:up:worker        # just the workers from source, restarted on code changes
 ```

@@ -89,7 +89,7 @@ def snapshot_event(job: JobRow) -> ProgressEvent | None:
 
 
 def _sse(event: JobEvent, entry_id: str | None = None) -> ServerSentEvent:
-    return ServerSentEvent(data=event.model_dump_json(exclude_none=True), id=entry_id)
+    return ServerSentEvent(data=event.model_dump_json(), id=entry_id)
 
 
 async def _reload(pool: AsyncConnectionPool[AsyncConnection[Any]], job_id: UUID) -> JobRow:

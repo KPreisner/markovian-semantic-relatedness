@@ -4,7 +4,8 @@ volumes and an empty data tree, driven only through web's published port.
 1. `task up`: build, migrate, start, and wait until healthy.
 2. The builder parses the toy corpus, builds and registers a model, and prepares and registers a
    CC-NEWS corpus (`task build:*`, as the README does it).
-3. Through web (`/fastapi/…`): a concept job and a search job, followed over SSE.
+3. Through web: the API docs (`/fastapi/…`), then a concept job and a search job through the BFF
+   (`/api/…`), followed over its SSE relay.
 4. `docker compose down --volumes`.
 
 It needs Docker and `task` on the host, and runs where the stack is (locally or in CI), not in the
@@ -39,6 +40,9 @@ ROOT = Path(__file__).parents[2]
 class Stack:
     web: str
     api: str
+    """The API through web's /fastapi rewrite (its docs and schema)."""
+    bff: str
+    """The BFF's route handlers (/api), which the UI uses."""
     env: dict[str, str]
 
 
@@ -89,7 +93,7 @@ def stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
         ]:  # fmt: skip
             run(["task", task, "--", *args], env)
         web = f"http://127.0.0.1:{port}"
-        yield Stack(web, f"{web}/fastapi", env)
+        yield Stack(web, f"{web}/fastapi", f"{web}/api", env)
     except BaseException:
         print(run(["docker", "compose", "logs", "--no-color"], env))
         raise
@@ -132,7 +136,7 @@ def test_the_api_docs_are_served_through_web(stack: Stack) -> None:
     docs = httpx.get(f"{stack.web}/fastapi", follow_redirects=True)
     assert docs.status_code == 200 and "url: '/fastapi/openapi.json'" in docs.text
     assert get(f"{stack.api}/openapi.json")["servers"] == [{"url": "/fastapi"}]
-    health = get(f"{stack.api}/health")
+    health = get(f"{stack.bff}/health")
     assert health["status"] == "ok" and health["workers"]["count"] == 2
     consumers = {q["name"]: q["consumers"] for q in health["broker"]["queues"]}
     assert (consumers["cpu"], consumers["search"]) == (1, 1)
@@ -140,31 +144,33 @@ def test_the_api_docs_are_served_through_web(stack: Stack) -> None:
 
 
 def test_the_builder_registered_the_model_and_corpus(stack: Stack) -> None:
-    assert MODEL_ID in {m["model_id"] for m in get(f"{stack.api}/models")}
-    assert CORPUS_ID in {c["corpus_id"] for c in get(f"{stack.api}/corpora")}
+    assert MODEL_ID in {m["model_id"] for m in get(f"{stack.bff}/models")}
+    assert CORPUS_ID in {c["corpus_id"] for c in get(f"{stack.bff}/corpora")}
 
 
 def test_a_concept_job_then_a_search_job(stack: Stack) -> None:
-    concepts = f"{stack.api}/models/{MODEL_ID}/concepts"
+    concepts = f"{stack.bff}/models/{MODEL_ID}/concepts"
     pending = httpx.post(concepts, json={"root": "cat", "threshold": 0.0}, timeout=30)
     assert pending.status_code == 202, pending.text
-    events = read_events(stack.api, pending.json()["job_id"], timeout=60)
+    events = read_events(stack.bff, pending.json()["job_id"], timeout=60)
     assert events[-1][1]["type"] == "result", events
     concept_id = events[-1][1]["result_id"]
+    # The same stream through the /fastapi rewrite: replayed in full, and not compressed.
+    assert read_events(stack.api, pending.json()["job_id"])[-1] == events[-1]
     assert {data["type"] for _, data in events[:-1]} <= {"progress"}
 
     again = httpx.post(concepts, json={"root": "cat", "threshold": 0.0}, timeout=30)
     assert (again.status_code, again.json()["concept_id"]) == (200, concept_id)
-    assert get(f"{stack.api}/concepts/{concept_id}")["terms"][0]["term"] == "cat"
+    assert get(f"{stack.bff}/concepts/{concept_id}")["terms"][0]["term"] == "cat"
 
     started = httpx.post(
-        f"{stack.api}/searches", json={"concept_ids": [concept_id], "corpus": CORPUS_ID}, timeout=30
+        f"{stack.bff}/searches", json={"concept_ids": [concept_id], "corpus": CORPUS_ID}, timeout=30
     )
     assert started.status_code == 202, started.text
     search_id = started.json()["search_id"]
-    events = read_events(stack.api, started.json()["job_id"], timeout=60)
+    events = read_events(stack.bff, started.json()["job_id"], timeout=60)
     assert events[-1][1] == {"type": "result", "result_id": search_id}
-    [best] = get(f"{stack.api}/searches/{search_id}")["hits"]
+    [best] = get(f"{stack.bff}/searches/{search_id}")["hits"]
     assert best["chunk_text"].startswith("Every morning the cat sat in the hat")
     assert best["chunk_index"] == 1  # trafilatura keeps the <h1> as line 0
     assert {"cat", "hat"} <= {m["term"] for m in best["matches"]}
@@ -177,7 +183,7 @@ def test_clear_results_refuses_while_a_job_is_active_then_clears(stack: Stack) -
     assert any((data / "concepts").iterdir()) and any((data / "searches").iterdir())
     run(["docker", "compose", "stop", "worker-cpu"], stack.env)
     queued = httpx.post(
-        f"{stack.api}/models/{MODEL_ID}/concepts", json={"root": "dog"}, timeout=30
+        f"{stack.bff}/models/{MODEL_ID}/concepts", json={"root": "dog"}, timeout=30
     ).json()
     assert queued["job"]["status"] == "queued"
 
@@ -191,16 +197,16 @@ def test_clear_results_refuses_while_a_job_is_active_then_clears(stack: Stack) -
     )
     assert refused.returncode != 0
     assert "1 job(s) are queued or running" in refused.stderr
-    assert get(f"{stack.api}/models/{MODEL_ID}/concepts?root=cat")  # nothing deleted
+    assert get(f"{stack.bff}/models/{MODEL_ID}/concepts?root=cat")  # nothing deleted
 
     out = run(["task", "clear-results", "--yes", "FORCE=1"], stack.env)
     assert "data/concepts: 1 entries deleted" in out and "data/searches: 1 entries deleted" in out
-    assert get(f"{stack.api}/models/{MODEL_ID}/concepts?root=cat") == []
-    assert httpx.get(f"{stack.api}/jobs/{queued['job_id']}").status_code == 404
+    assert get(f"{stack.bff}/models/{MODEL_ID}/concepts?root=cat") == []
+    assert httpx.get(f"{stack.bff}/jobs/{queued['job_id']}").status_code == 404
     assert not any((data / "concepts").iterdir()) and not any((data / "searches").iterdir())
-    jobs = get(f"{stack.api}/health")["jobs"]
+    jobs = get(f"{stack.bff}/health")["jobs"]
     assert (jobs["queued"], jobs["running"]) == (0, 0)
     # Models (with their X′) and corpora stay.
     assert (data / "models" / MODEL_ID / "refs" / "degree-mean" / "Xprime.npy").exists()
-    assert MODEL_ID in {m["model_id"] for m in get(f"{stack.api}/models")}
-    assert CORPUS_ID in {c["corpus_id"] for c in get(f"{stack.api}/corpora")}
+    assert MODEL_ID in {m["model_id"] for m in get(f"{stack.bff}/models")}
+    assert CORPUS_ID in {c["corpus_id"] for c in get(f"{stack.bff}/corpora")}

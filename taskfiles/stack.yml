@@ -56,7 +56,7 @@ tasks:
     prompt: This deletes the Postgres, RabbitMQ, and Redis volumes and the msr images. Continue?
     cmds:
       - docker compose --profile build --profile test down --volumes --rmi local --remove-orphans
-      - docker image rm -f msr-builder:develop msr-api:develop msr-worker:develop
+      - docker image rm -f msr-builder:develop msr-api:develop msr-worker:develop msr-web:develop
 
   # Postgres first (one transaction), then the progress streams, then the files: a concept or
   # search can't be served once its rows are gone. The files are removed from the worker container

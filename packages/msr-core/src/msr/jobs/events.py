@@ -21,7 +21,10 @@ def stream_key(job_id: UUID | str) -> str:
 
 
 class _Event(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    # Serialized events always carry every field, `type` included.
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", json_schema_serialization_defaults_required=True
+    )
 
 
 class ProgressEvent(_Event):

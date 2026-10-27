@@ -5,6 +5,7 @@ version: "3"
 
 includes:
   py: taskfiles/py.yml
+  web: taskfiles/web.yml
   stack:
     taskfile: taskfiles/stack.yml
     flatten: true
@@ -23,9 +24,10 @@ tasks:
     silent: true
 
   check:
-    desc: Lint, type check, and test (alias of py:check)
+    desc: Lint, type check, and test, Python and web (py:check, then web:check)
     cmds:
       - task: py:check
+      - task: web:check
 
   msr:
     desc: "Run the msr CLI natively (e.g. -- concept trumpet --model <id>)"

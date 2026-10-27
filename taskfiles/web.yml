@@ -1,0 +1,65 @@
+version: "3"
+
+# The web app (web/). Node runs only in containers: every task here runs in the compose
+# `web-tools` service, with node_modules in a named volume (see compose.yaml).
+
+vars:
+  NODE: docker compose --profile tools run --rm web-tools
+
+tasks:
+  install:
+    desc: Install web/ dependencies from package-lock.json (npm ci) into the node_modules volume
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} npm ci --no-audit --no-fund"
+
+  npm:
+    desc: "Run npm in web/ (e.g. -- install zod, -- outdated)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} npm {{.CLI_ARGS}}"
+
+  lint:
+    desc: ESLint and Prettier --check
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} sh -c 'npm run -s lint && npm run -s format:check'"
+
+  format:
+    desc: Format web/ with Prettier
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} npm run -s format"
+
+  typecheck:
+    desc: Next's route types, then tsc
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} npm run -s typecheck"
+
+  test:
+    desc: "Vitest (e.g. -- tests/events.test.ts)"
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - "{{.NODE}} npx vitest run {{.CLI_ARGS}}"
+
+  typegen:
+    desc: Regenerate web/openapi.json from the API, then the BFF's types and Zod schemas (web/lib/api/)
+    dir: "{{.ROOT_DIR}}"
+    deps: [":validate"]
+    cmds:
+      - uv run python -m msr_api.openapi web/openapi.json
+      - "{{.NODE}} npm run -s typegen"
+
+  check:
+    desc: lint, typecheck, and test
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
