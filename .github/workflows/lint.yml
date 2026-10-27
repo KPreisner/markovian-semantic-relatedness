@@ -18,3 +18,30 @@ jobs:
         run: uv run ruff format --check
       - name: mypy
         run: uv run mypy
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - run: npm ci --no-audit --no-fund
+      - name: Generated API types are current (task web:typegen)
+        run: |
+          uv run python -m msr_api.openapi openapi.json
+          npm run typegen
+          changed=$(git status --porcelain -- openapi.json lib/api)
+          if [ -n "$changed" ]; then
+            echo "Run task web:typegen and commit the result:"; echo "$changed"; exit 1
+          fi
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck

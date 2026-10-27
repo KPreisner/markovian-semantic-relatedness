@@ -29,23 +29,29 @@ x-worker: &worker
       condition: service_healthy
 
 services:
-  # The only published port (127.0.0.1:${MSR_WEB_PORT:-3000}). A placeholder until the Next.js UI
-  # (Phase 6): a holding page, and the API under /fastapi/ with its docs at /fastapi/docs.
+  # The only published port (127.0.0.1:${MSR_WEB_PORT:-3000}). The Next.js UI and its BFF (/api/*,
+  # which calls the API), plus the API itself under /fastapi/ with its docs at /fastapi/docs.
   web:
-    image: nginx:1.30.6-alpine
-    # Directories, not single files: an editor that saves by replacing a file would leave a
-    # single-file mount pointing at the old one.
-    volumes:
-      - ./docker/web/conf.d:/etc/nginx/conf.d:ro
-      - ./docker/web/html:/usr/share/nginx/html:ro
+    image: msr-web:latest
+    build:
+      context: web
+      target: prod
+    <<: *env-files
+    environment:
+      MSR_API_URL: http://api:8000
     ports:
-      - "127.0.0.1:${MSR_WEB_PORT:-3000}:80"
+      - "127.0.0.1:${MSR_WEB_PORT:-3000}:3000"
     networks: [frontend, backend]
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
     depends_on:
       api:
         condition: service_healthy
@@ -216,6 +222,22 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Node tooling for web/ (`task web:*`): npm, ESLint, Vitest, and type generation run here, not
+  # on the host. node_modules lives in a named volume, so the host never gets Linux binaries.
+  web-tools:
+    image: node:24.22.1-alpine3.24
+    profiles: [tools]
+    working_dir: /app
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+      # Next's build output and generated types stay in the container too.
+      - /app/.next
+    # npm needs the registry; nothing here talks to the backend.
+    networks: [frontend]
+
   # Integration tests (`task py:test:integration`): the whole workspace with the source, tests,
   # and migrations mounted, on the backend network where Postgres, Redis, and RabbitMQ are
   # reachable. The tests create and drop their own scratch databases and queues.
@@ -246,6 +268,7 @@ services:
         condition: service_healthy
 
 volumes:
+  web-node-modules:
   postgres-data:
   rabbitmq-data:
   redis-data:

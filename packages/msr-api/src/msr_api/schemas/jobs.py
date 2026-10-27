@@ -2,8 +2,9 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
+from msr.jobs.events import JobEvent
 from msr_api.schemas import Schema
 
 
@@ -29,3 +30,8 @@ class Job(Schema):
     compute_seconds: float | None = Field(
         description="How long the latest attempt ran: until it finished, or so far while running"
     )
+
+
+class JobEventData(RootModel[JobEvent]):
+    """One Server-Sent Event's `data:` from `GET /jobs/{job_id}/events`. In the OpenAPI schema so
+    clients (the BFF's Zod union) are generated from the same definition as the worker's."""

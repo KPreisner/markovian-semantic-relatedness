@@ -6,7 +6,7 @@ from sse_starlette import EventSourceResponse
 
 from msr_api.dependencies import Connection, Pool, RedisClient, Settings
 from msr_api.schemas.errors import NOT_FOUND, UNPROCESSABLE
-from msr_api.schemas.jobs import Job
+from msr_api.schemas.jobs import Job, JobEventData
 from msr_api.services import events, jobs
 
 EVENTS_EXAMPLE = """\
@@ -39,6 +39,7 @@ async def get_job(conn: Connection, job_id: UUID) -> Job:
                 " and `hits`), `result` (`result_id`: the concept or search id), or `error`"
                 " (`code`, `message`). `id:` is the stream entry id; comment lines are pings."
             ),
+            "model": JobEventData,
             "content": {"text/event-stream": {"example": EVENTS_EXAMPLE}},
         }
     },
@@ -62,6 +63,10 @@ async def job_events(
         last_event_id=last_event_id,
         block_ms=settings.sse_block_ms,
     )
+    # `no-transform` keeps proxies from compressing the stream, which would hold every event
+    # until it ends (Next's /fastapi rewrite gzips otherwise); X-Accel-Buffering is nginx's.
     return EventSourceResponse(
-        stream, ping=settings.sse_ping_seconds, headers={"X-Accel-Buffering": "no"}
+        stream,
+        ping=settings.sse_ping_seconds,
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )

@@ -4,12 +4,15 @@ never returns (see `core.errors`)."""
 
 from typing import Any
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from msr_api.schemas import Schema
 
 
 class ErrorDetail(Schema):
+    # `details` is left out when there are none (core.errors.error_body), so it isn't required.
+    model_config = ConfigDict(json_schema_serialization_defaults_required=False)
+
     code: str = Field(description="Machine-readable, e.g. `term_not_found`, `refs_not_built`")
     message: str
     details: Any = Field(None, description="Present for some codes, e.g. validation errors")

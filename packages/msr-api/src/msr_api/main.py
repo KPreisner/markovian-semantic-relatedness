@@ -11,6 +11,7 @@ from typing import Any
 
 import structlog
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 from redis.asyncio import Redis
@@ -54,6 +55,31 @@ TAGS = [
     {"name": "jobs", "description": "Job status and progress (Server-Sent Events)"},
     {"name": "health", "description": "Liveness of Postgres and Redis"},
 ]
+
+
+def openapi_schema(app: FastAPI) -> dict[str, Any]:
+    """FastAPI's schema, with each event stream's `model` documented where it belongs. FastAPI
+    files a `responses` model under `application/json`; an `EventSourceResponse` route never
+    returns JSON, so the schema moves to its `text/event-stream` content (one event's data)."""
+    if app.openapi_schema is None:
+        spec = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+            tags=app.openapi_tags,
+            servers=app.servers,
+        )
+        for path in spec["paths"].values():
+            for operation in path.values():
+                for response in operation.get("responses", {}).values():
+                    content = response.get("content", {})
+                    if "text/event-stream" in content and "application/json" in content:
+                        content["text/event-stream"]["schema"] = content.pop("application/json")[
+                            "schema"
+                        ]
+        app.openapi_schema = spec
+    return app.openapi_schema
 
 
 def create_app(
@@ -104,11 +130,14 @@ def create_app(
         version=msr.__version__,
         description=DESCRIPTION,
         openapi_tags=TAGS,
+        # Operation ids are the handler names (`list_models`), so generated clients read well.
+        generate_unique_id_function=lambda route: route.name,
         lifespan=lifespan,
     )
     errors.install(app)
     for router in (health, models, concepts, corpora, searches, jobs):
         app.include_router(router.router)
+    app.openapi = lambda: openapi_schema(app)  # type: ignore[method-assign]
     # Outermost last: the correlation id is bound before the response line is logged.
     app.add_middleware(ResponseLoggingMiddleware)
     app.add_middleware(CorrelationIdMiddleware)

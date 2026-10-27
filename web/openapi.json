@@ -1,0 +1,2356 @@
+{
+  "components": {
+    "schemas": {
+      "ApiInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "instance": {
+            "description": "The API container that answered (its hostname)",
+            "title": "Instance",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "instance",
+          "uptime_seconds"
+        ],
+        "title": "ApiInfo",
+        "type": "object"
+      },
+      "BrokerCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it's down",
+            "title": "Error"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Round trip of the check, when it succeeded",
+            "title": "Latency Ms"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/QueueInfo"
+            },
+            "title": "Queues",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "down"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latency_ms",
+          "error",
+          "queues"
+        ],
+        "title": "BrokerCheck",
+        "type": "object"
+      },
+      "Check": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it's down",
+            "title": "Error"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Round trip of the check, when it succeeded",
+            "title": "Latency Ms"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "down"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latency_ms",
+          "error"
+        ],
+        "title": "Check",
+        "type": "object"
+      },
+      "Concept": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job that built it: attempts, warnings, compute time (null if none)"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "params_hash": {
+            "title": "Params Hash",
+            "type": "string"
+          },
+          "root": {
+            "$ref": "#/components/schemas/RootTerm"
+          },
+          "term_count": {
+            "description": "Ranked terms stored",
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptTerm"
+            },
+            "title": "Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "concept_id",
+          "model_id",
+          "root",
+          "params",
+          "params_hash",
+          "created_at",
+          "term_count",
+          "job",
+          "terms"
+        ],
+        "title": "Concept",
+        "type": "object"
+      },
+      "ConceptRequest": {
+        "additionalProperties": false,
+        "description": "A root term plus any concept parameters to override. Omitted parameters take their\ndefaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.",
+        "examples": [
+          {
+            "root": "trumpet"
+          },
+          {
+            "root": "trumpet",
+            "threshold": 4.0
+          }
+        ],
+        "properties": {
+          "q": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "refs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reference strategy, e.g. `degree-mean`",
+            "title": "Refs"
+          },
+          "root": {
+            "description": "The root term, matched case-sensitively",
+            "minLength": 1,
+            "title": "Root",
+            "type": "string"
+          },
+          "root_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Weight"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          },
+          "stored_terms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Terms"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "trim_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trim Ratio"
+          }
+        },
+        "required": [
+          "root"
+        ],
+        "title": "ConceptRequest",
+        "type": "object"
+      },
+      "ConceptStatus": {
+        "additionalProperties": false,
+        "description": "`ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is\nthat job in full: its status, attempts, warnings, error, and compute time.",
+        "properties": {
+          "concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job building the concept, or the one that built it (null for a concept stored without a job)"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "pending"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "concept_id",
+          "job_id",
+          "job"
+        ],
+        "title": "ConceptStatus",
+        "type": "object"
+      },
+      "ConceptSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job that built it (`GET /jobs/{job_id}`)",
+            "title": "Job Id"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "params_hash": {
+            "title": "Params Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept_id",
+          "params",
+          "params_hash",
+          "created_at",
+          "job_id"
+        ],
+        "title": "ConceptSummary",
+        "type": "object"
+      },
+      "ConceptTerm": {
+        "additionalProperties": false,
+        "properties": {
+          "cooccur": {
+            "description": "C[root, term]",
+            "title": "Cooccur",
+            "type": "integer"
+          },
+          "rank": {
+            "description": "1 is the root",
+            "title": "Rank",
+            "type": "integer"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          },
+          "term_count": {
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "term_idx": {
+            "title": "Term Idx",
+            "type": "integer"
+          },
+          "weight": {
+            "description": "Scaled so the root is `root_weight`",
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rank",
+          "term_idx",
+          "term",
+          "term_count",
+          "weight",
+          "cooccur"
+        ],
+        "title": "ConceptTerm",
+        "type": "object"
+      },
+      "Corpus": {
+        "additionalProperties": false,
+        "properties": {
+          "byte_count": {
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "corpus_id": {
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "file_count": {
+            "title": "File Count",
+            "type": "integer"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "id_field": {
+            "title": "Id Field",
+            "type": "string"
+          },
+          "text_field": {
+            "title": "Text Field",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "corpus_id",
+          "description",
+          "formats",
+          "text_field",
+          "id_field",
+          "file_count",
+          "byte_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Corpus",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Machine-readable, e.g. `term_not_found`, `refs_not_built`",
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "description": "Present for some codes, e.g. validation errors",
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "code",
+          "message"
+        ],
+        "title": "ErrorEvent",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "Health": {
+        "additionalProperties": false,
+        "properties": {
+          "api": {
+            "$ref": "#/components/schemas/ApiInfo"
+          },
+          "broker": {
+            "$ref": "#/components/schemas/BrokerCheck"
+          },
+          "jobs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobsInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active jobs (null if Postgres is down)"
+          },
+          "postgres": {
+            "$ref": "#/components/schemas/Check"
+          },
+          "redis": {
+            "$ref": "#/components/schemas/Check"
+          },
+          "status": {
+            "description": "`down` (HTTP 503): Postgres, Redis, or RabbitMQ is unreachable; `degraded`: no worker answered; otherwise `ok`",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "workers": {
+            "$ref": "#/components/schemas/WorkersCheck"
+          }
+        },
+        "required": [
+          "status",
+          "api",
+          "postgres",
+          "redis",
+          "broker",
+          "workers",
+          "jobs"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "description": "Attempts started (a retried or redelivered job has more)",
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "compute_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the latest attempt ran: until it finished, or so far while running",
+            "title": "Compute Seconds"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "enum": [
+              "concept",
+              "search"
+            ],
+            "title": "Job Type",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last progress event, throttled",
+            "title": "Progress"
+          },
+          "result_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The concept or search, once succeeded",
+            "title": "Result Id"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the latest attempt started",
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "E.g. a retry and why, or a restart after a crash",
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "status",
+          "model_id",
+          "params",
+          "progress",
+          "result_id",
+          "error",
+          "attempts",
+          "warnings",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "compute_seconds"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "JobError",
+        "type": "object"
+      },
+      "JobEvent": {
+        "discriminator": {
+          "mapping": {
+            "error": "#/components/schemas/ErrorEvent",
+            "progress": "#/components/schemas/ProgressEvent",
+            "result": "#/components/schemas/ResultEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ProgressEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ResultEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorEvent"
+          }
+        ]
+      },
+      "JobEventData": {
+        "$ref": "#/components/schemas/JobEvent",
+        "description": "One Server-Sent Event's `data:` from `GET /jobs/{job_id}/events`. In the OpenAPI schema so\nclients (the BFF's Zod union) are generated from the same definition as the worker's.",
+        "title": "JobEventData"
+      },
+      "JobsInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "oldest_queued_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the oldest queued job has waited",
+            "title": "Oldest Queued Seconds"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued",
+          "running",
+          "oldest_queued_seconds"
+        ],
+        "title": "JobsInfo",
+        "type": "object"
+      },
+      "Live": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Live",
+        "type": "object"
+      },
+      "Match": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "start",
+          "end"
+        ],
+        "title": "Match",
+        "type": "object"
+      },
+      "ModelDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "manifest": {
+            "additionalProperties": true,
+            "description": "The model's full manifest",
+            "title": "Manifest",
+            "type": "object"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "parts_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts Total"
+          },
+          "parts_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parsed parts used (null: all)",
+            "title": "Parts Used"
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline"
+          },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
+          "reference_steps": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Each built reference strategy → the λ of its X′ (a concept's default steps)",
+            "title": "Reference Steps",
+            "type": "object"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the model was built from",
+            "title": "Source"
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stop-word rule, e.g. `top:100`",
+            "title": "Stop Words"
+          },
+          "term_count": {
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "model_name",
+          "description",
+          "term_count",
+          "reference_steps",
+          "stop_words",
+          "source",
+          "pipeline",
+          "pipeline_version",
+          "parts_used",
+          "parts_total",
+          "created_at",
+          "updated_at",
+          "manifest"
+        ],
+        "title": "ModelDetail",
+        "type": "object"
+      },
+      "ModelSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "parts_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts Total"
+          },
+          "parts_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parsed parts used (null: all)",
+            "title": "Parts Used"
+          },
+          "pipeline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline"
+          },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
+          "reference_steps": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Each built reference strategy → the λ of its X′ (a concept's default steps)",
+            "title": "Reference Steps",
+            "type": "object"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the model was built from",
+            "title": "Source"
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stop-word rule, e.g. `top:100`",
+            "title": "Stop Words"
+          },
+          "term_count": {
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "model_name",
+          "description",
+          "term_count",
+          "reference_steps",
+          "stop_words",
+          "source",
+          "pipeline",
+          "pipeline_version",
+          "parts_used",
+          "parts_total",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ModelSummary",
+        "type": "object"
+      },
+      "ProgressEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes_scanned": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Search jobs only",
+            "title": "Bytes Scanned"
+          },
+          "hits": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Search jobs only",
+            "title": "Hits"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "step": {
+            "minimum": 0.0,
+            "title": "Step",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "type": {
+            "const": "progress",
+            "default": "progress",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "phase",
+          "step",
+          "total",
+          "message",
+          "bytes_scanned",
+          "hits"
+        ],
+        "title": "ProgressEvent",
+        "type": "object"
+      },
+      "QueueInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "consumers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Worker processes consuming it",
+            "title": "Consumers"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Waiting to be delivered (null: not declared yet)",
+            "title": "Messages"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "messages",
+          "consumers"
+        ],
+        "title": "QueueInfo",
+        "type": "object"
+      },
+      "ResultEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "result_id": {
+            "format": "uuid",
+            "title": "Result Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "result",
+            "default": "result",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "result_id"
+        ],
+        "title": "ResultEvent",
+        "type": "object"
+      },
+      "RootTerm": {
+        "additionalProperties": false,
+        "properties": {
+          "term": {
+            "title": "Term",
+            "type": "string"
+          },
+          "term_idx": {
+            "title": "Term Idx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "term_idx",
+          "term"
+        ],
+        "title": "RootTerm",
+        "type": "object"
+      },
+      "Search": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "corpus_id": {
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "hits": {
+            "description": "Ranked; empty until the job succeeds",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            },
+            "title": "Hits",
+            "type": "array"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job running or that ran this search"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "search_id": {
+            "format": "uuid",
+            "title": "Search Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "search_id",
+          "model_id",
+          "corpus_id",
+          "concept_ids",
+          "params",
+          "created_at",
+          "job",
+          "hits"
+        ],
+        "title": "Search",
+        "type": "object"
+      },
+      "SearchHit": {
+        "additionalProperties": false,
+        "properties": {
+          "chunk_index": {
+            "title": "Chunk Index",
+            "type": "integer"
+          },
+          "chunk_text": {
+            "title": "Chunk Text",
+            "type": "string"
+          },
+          "concept_scores": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Concept Scores",
+            "type": "array"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "doc_offset": {
+            "title": "Doc Offset",
+            "type": "integer"
+          },
+          "file_path": {
+            "title": "File Path",
+            "type": "string"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/Match"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rank",
+          "doc_id",
+          "file_path",
+          "doc_offset",
+          "chunk_index",
+          "chunk_text",
+          "matches",
+          "concept_scores",
+          "score"
+        ],
+        "title": "SearchHit",
+        "type": "object"
+      },
+      "SearchRequest": {
+        "additionalProperties": false,
+        "examples": [
+          {
+            "concept_ids": [
+              "01a17a3a-3769-7e56-8f8c-5589890d593c"
+            ],
+            "corpus": "ccnews-en"
+          }
+        ],
+        "properties": {
+          "concept_ids": {
+            "description": "Concepts of one model; several combine by geometric mean",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "corpus": {
+            "minLength": 1,
+            "title": "Corpus",
+            "type": "string"
+          },
+          "top_k_terms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Concept terms matched (10–1000)",
+            "title": "Top K Terms"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hits kept (1–1000)",
+            "title": "Top N"
+          }
+        },
+        "required": [
+          "concept_ids",
+          "corpus"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "SearchStarted": {
+        "additionalProperties": false,
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job",
+            "description": "The search's job: status, attempts, warnings, compute time"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "search_id": {
+            "format": "uuid",
+            "title": "Search Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "search_id",
+          "job_id",
+          "job"
+        ],
+        "title": "SearchStarted",
+        "type": "object"
+      },
+      "Term": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          },
+          "term_count": {
+            "title": "Term Count",
+            "type": "integer"
+          },
+          "term_idx": {
+            "title": "Term Idx",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "term_idx",
+          "term",
+          "term_count",
+          "language"
+        ],
+        "title": "Term",
+        "type": "object"
+      },
+      "WorkersCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "nodes": {
+            "description": "Workers that answered a ping, e.g. `celery@<host>`",
+            "items": {
+              "type": "string"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "status": {
+            "description": "`none`: no worker answered, so jobs queue but don't run; `unknown`: the broker is down",
+            "enum": [
+              "ok",
+              "none",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "count",
+          "nodes"
+        ],
+        "title": "WorkersCheck",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Concepts and ranked semantic search over co-occurrence models\n([Markovian Semantic Relatedness](https://github.com/KPreisner/markovian-semantic-relatedness)).\n\n**How a request flows**\n1. Pick a model (`GET /models`) and a root term (`GET /models/{model_id}/terms?prefix=`).\n2. `POST /models/{model_id}/concepts`: `200 ready` with a `concept_id` if it's cached, otherwise\n   `202 pending` with the `job_id` building it. Identical requests share one job.\n3. Follow the job: `GET /jobs/{job_id}/events` streams its progress as Server-Sent Events and\n   ends with `result` (or `error`); `GET /jobs/{job_id}` is the same state for polling.\n4. `GET /concepts/{concept_id}` is the ranked table. `POST /searches` with one or more concepts\n   and a corpus (`GET /corpora`) starts a search job the same way; `GET /searches/{search_id}`\n   has its hits.\n\nTerms are case-sensitive. Every error has one shape: `{\"error\": {\"code\", \"message\", \"details\"?}}`.\nSend `X-Correlation-ID` (a UUID) to trace a request through the logs; the response echoes it.\n",
+    "title": "Markovian Semantic Relatedness API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/concepts/{concept_id}": {
+      "get": {
+        "description": "The ranked concept table, with term strings and counts from the model's vocab.",
+        "operationId": "get_concept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Concept Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 5000,
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Concept"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Get Concept",
+        "tags": [
+          "concepts"
+        ]
+      }
+    },
+    "/corpora": {
+      "get": {
+        "operationId": "list_corpora",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Corpus"
+                  },
+                  "title": "Response List Corpora",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Corpora",
+        "tags": [
+          "corpora"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "The stack's health: the API itself, Postgres, Redis, RabbitMQ (with each queue's depth and\nconsumers), the workers that answer a ping, and the active jobs. 503 when Postgres, Redis, or\nRabbitMQ is down; `degraded` (still 200) when no worker answers. Takes about a second: the\nworker ping waits for replies.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "description": "The API process is up and serving. Instant and checks nothing else: the container\nhealthcheck.",
+        "operationId": "live",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Live"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "description": "The job's durable status, for clients that poll.",
+        "operationId": "get_job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Get Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/jobs/{job_id}/events": {
+      "get": {
+        "description": "The job's progress as Server-Sent Events: `progress` events, then one `result` or `error`,\nthen the stream closes. Reconnecting with `Last-Event-ID` resumes after that event.\nDisconnecting never cancels the job.",
+        "operationId": "job_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "last-event-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "example": "id: 1793052032506-0\ndata: {\"type\": \"progress\", \"phase\": \"walk\", \"step\": 1, \"total\": 100, \"message\": \"walking 'cello'\"}\n\n: ping\n\nid: 1793052038256-0\ndata: {\"type\": \"result\", \"result_id\": \"01a17a3a-d46b-72dd-aa6c-961d31ff8d8f\"}\n",
+                "schema": {
+                  "$ref": "#/components/schemas/JobEventData"
+                }
+              }
+            },
+            "description": "An event stream. Each event's `data:` is one JSON object with a `type`: `progress` (`phase`, `step`, `total`, `message`; searches add `bytes_scanned` and `hits`), `result` (`result_id`: the concept or search id), or `error` (`code`, `message`). `id:` is the stream entry id; comment lines are pings."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Job Events",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/models": {
+      "get": {
+        "operationId": "list_models",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelSummary"
+                  },
+                  "title": "Response List Models",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/models/{model_id}": {
+      "get": {
+        "operationId": "get_model",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Get Model",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/models/{model_id}/concepts": {
+      "get": {
+        "description": "Cached concepts for a root, with any parameters. Never starts a job.",
+        "operationId": "concepts_for_root",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "root",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Root",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConceptSummary"
+                  },
+                  "title": "Response Concepts For Root",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Concepts For Root",
+        "tags": [
+          "models"
+        ]
+      },
+      "post": {
+        "description": "200 `ready` with the cached concept's id, or 202 `pending` with the id of the job building\nit (a new job, or the one already building the same concept).",
+        "operationId": "request_concept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConceptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptStatus"
+                }
+              }
+            },
+            "description": "Cached: the concept is ready"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptStatus"
+                }
+              }
+            },
+            "description": "Pending: a job is building the concept"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The job couldn't be queued; try again"
+          }
+        },
+        "summary": "Request Concept",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/models/{model_id}/terms": {
+      "get": {
+        "description": "Autocomplete: terms starting with `prefix` (case-sensitive), most frequent first.",
+        "operationId": "terms",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "prefix",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Prefix",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Term"
+                  },
+                  "title": "Response Terms",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Terms",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/searches": {
+      "post": {
+        "description": "Search a corpus with one or more concepts of one model. Returns the search and its job.",
+        "operationId": "create_search",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The job couldn't be queued; try again"
+          }
+        },
+        "summary": "Create Search",
+        "tags": [
+          "searches"
+        ]
+      }
+    },
+    "/searches/{search_id}": {
+      "get": {
+        "description": "The search, its job, and its ranked hits (empty until the job succeeds).",
+        "operationId": "get_search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "search_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Search Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Search"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "Get Search",
+        "tags": [
+          "searches"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/fastapi"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Registered models, term autocomplete, concept requests",
+      "name": "models"
+    },
+    {
+      "description": "Cached concept tables",
+      "name": "concepts"
+    },
+    {
+      "description": "Registered search corpora",
+      "name": "corpora"
+    },
+    {
+      "description": "Search jobs and their ranked hits",
+      "name": "searches"
+    },
+    {
+      "description": "Job status and progress (Server-Sent Events)",
+      "name": "jobs"
+    },
+    {
+      "description": "Liveness of Postgres and Redis",
+      "name": "health"
+    }
+  ]
+}

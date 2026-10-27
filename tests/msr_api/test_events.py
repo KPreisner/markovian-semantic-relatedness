@@ -64,6 +64,9 @@ def test_events_arrive_in_order_with_their_stream_ids(
         "step": 2,
         "total": 2,
         "message": "",
+        # Every field goes out, the search-only ones as null: the schema the BFF checks says so.
+        "bytes_scanned": None,
+        "hits": None,
     }
     assert events[2][1]["result_id"] == str(result_id)
 
@@ -141,7 +144,18 @@ def test_an_active_job_without_a_stream_shows_its_snapshot_then_its_end(
     )
     reader.join(timeout=10)
     assert received == [
-        (None, {"type": "progress", "phase": "walk", "step": 5, "total": 50, "message": ""}),
+        (
+            None,
+            {
+                "type": "progress",
+                "phase": "walk",
+                "step": 5,
+                "total": 50,
+                "message": "",
+                "bytes_scanned": None,
+                "hits": None,
+            },
+        ),
         (None, {"type": "error", "code": "worker_lost", "message": ""}),
     ]
 

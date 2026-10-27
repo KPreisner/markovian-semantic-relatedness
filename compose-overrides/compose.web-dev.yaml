@@ -1,0 +1,15 @@
+# The web app from source with hot reload (`task dev:up:web`): the dev target running `next dev`
+# with web/ bind-mounted. node_modules (Linux binaries) is the same named volume `task web:*`
+# uses, and .next stays in the container.
+services:
+  web:
+    image: msr-web:develop
+    build:
+      target: dev
+    environment:
+      # Bind mounts from macOS don't deliver file events into the VM reliably.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+      - /app/.next

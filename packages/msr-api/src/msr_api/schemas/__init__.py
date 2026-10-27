@@ -4,4 +4,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Schema(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    # Responses always include defaulted fields, so their schema marks them required (generated
+    # clients then type them as present). Request schemas are unaffected.
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", json_schema_serialization_defaults_required=True
+    )

@@ -52,6 +52,11 @@ def test_the_event_stream_is_documented_as_one(spec: dict[str, Any]) -> None:
     ok = spec["paths"]["/jobs/{job_id}/events"]["get"]["responses"]["200"]
     assert list(ok["content"]) == ["text/event-stream"]
     assert '"type": "result"' in ok["content"]["text/event-stream"]["example"]
+    # One event's data, so the BFF's Zod union is generated from the worker's definition.
+    assert ok["content"]["text/event-stream"]["schema"] == {
+        "$ref": "#/components/schemas/JobEventData"
+    }
+    assert {"ProgressEvent", "ResultEvent", "ErrorEvent"} <= set(spec["components"]["schemas"])
 
 
 def test_requests_have_examples_and_tags_have_descriptions(spec: dict[str, Any]) -> None:
