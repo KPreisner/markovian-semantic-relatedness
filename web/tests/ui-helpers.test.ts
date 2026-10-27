@@ -1,9 +1,18 @@
-// The UI's pure helpers: highlight segmentation, match strength, formatting, and the recent-concepts
-// store.
+// The UI's pure helpers: highlight segmentation, match strength, the concepts index's filters,
+// formatting, and the recent-concepts store.
 import { describe, expect, it } from "vitest";
 
 import { readRecent, rememberConcept } from "@/lib/client/recent";
-import { formatBytes, formatSeconds, formatWeight, paramsLabel, percent } from "@/lib/format";
+import { CONCEPT_INDEX, SEARCH_INDEX } from "@/lib/index-filters";
+import {
+  formatBytes,
+  formatSeconds,
+  formatWeight,
+  paramsLabel,
+  percent,
+  scoringLabel,
+  usesScoringDefaults,
+} from "@/lib/format";
 import { segments } from "@/lib/highlight";
 import { strongFor, weakConcepts } from "@/lib/strength";
 
@@ -84,6 +93,62 @@ describe("match strength", () => {
   });
 });
 
+describe("index filters", () => {
+  const counts = { ready: 120, queued: 1, running: 2, failed: 3 };
+  const none = { tab: "all", term: "", model: "", corpus: "", page: 1 };
+
+  it("reads the URL, falling back to defaults for anything unknown", () => {
+    expect(CONCEPT_INDEX.parse({})).toEqual(none);
+    expect(
+      SEARCH_INDEX.parse({ tab: "failed", term: " cat ", model: "m", corpus: "c", page: "3" }),
+    ).toEqual({ tab: "failed", term: "cat", model: "m", corpus: "c", page: 3 });
+    expect(CONCEPT_INDEX.parse({ tab: "bogus", page: "-2" })).toMatchObject({
+      tab: "all",
+      page: 1,
+    });
+    expect(CONCEPT_INDEX.parse({ tab: ["built", "failed"], page: "x" })).toMatchObject({
+      tab: "built",
+      page: 1,
+    });
+    // Each index has its own tabs.
+    expect(SEARCH_INDEX.parse({ tab: "built" }).tab).toBe("all");
+  });
+
+  it("asks the API for the tab's statuses and the page's rows", () => {
+    expect(CONCEPT_INDEX.apiQuery({ ...none, tab: "building", page: 2 })).toEqual({
+      status: ["queued", "running"],
+      term: undefined,
+      model: undefined,
+      corpus: undefined,
+      limit: 50,
+      offset: 50,
+    });
+    expect(SEARCH_INDEX.apiQuery({ ...none, tab: "done", corpus: "c" })).toMatchObject({
+      status: ["succeeded"],
+      corpus: "c",
+    });
+    expect(CONCEPT_INDEX.apiQuery(none).status).toBeUndefined();
+  });
+
+  it("writes the URL back without defaults", () => {
+    expect(CONCEPT_INDEX.href(none)).toBe("/concepts");
+    expect(CONCEPT_INDEX.href({ ...none, tab: "failed", term: "Ron W", page: 2 })).toBe(
+      "/concepts?tab=failed&term=Ron+W&page=2",
+    );
+    expect(SEARCH_INDEX.href({ ...none, corpus: "ccnews-en" })).toBe("/searches?corpus=ccnews-en");
+  });
+
+  it("counts each tab and its pages", () => {
+    expect(CONCEPT_INDEX.tabCount("all", counts)).toBe(126);
+    expect(CONCEPT_INDEX.tabCount("building", counts)).toBe(3);
+    expect(CONCEPT_INDEX.pageCount({ ...none, tab: "built" }, counts)).toBe(3);
+    expect(CONCEPT_INDEX.pageCount({ ...none, tab: "failed" }, { ...counts, failed: 0 })).toBe(1);
+    expect(SEARCH_INDEX.tabCount("done", { queued: 0, running: 1, succeeded: 4, failed: 2 })).toBe(
+      4,
+    );
+  });
+});
+
 describe("formatting", () => {
   it("formats weights from the root's 100 down to tiny values", () => {
     expect([100, 70.62, 1.6, 0.034, 0.00012].map(formatWeight)).toEqual([
@@ -107,13 +172,31 @@ describe("formatting", () => {
     expect([percent(50, 100), percent(5, 0), percent(150, 100)]).toEqual([50, 0, 100]);
   });
 
-  it("labels a concept's parameters, mentioning only Q and R when changed", () => {
-    expect(
-      paramsLabel({ refs: "degree-mean", steps: 100, threshold: 6, q: 50, trim_ratio: 0.2 }),
-    ).toBe("degree-mean · λ 100 · z ≥ 6");
-    expect(paramsLabel({ refs: "random:7", steps: 20, threshold: 4, q: 30, trim_ratio: 0.1 })).toBe(
-      "random:7 · λ 20 · z ≥ 4 · Q 30 · R 0.1",
+  const defaults = {
+    refs: "degree-mean",
+    steps: 1000,
+    threshold: 6,
+    q: 50,
+    trim_ratio: 0.2,
+    stored_terms: 5000,
+    root_weight: 100,
+  };
+
+  it("labels a concept's parameters, mentioning settings other than z only when changed", () => {
+    expect(paramsLabel(defaults)).toBe("degree-mean · λ 1000 · z ≥ 6");
+    expect(paramsLabel({ ...defaults, steps: 20, threshold: 4, q: 30, trim_ratio: 0.1 })).toBe(
+      "degree-mean · λ 20 · z ≥ 4 · R 0.1 · Q 30",
     );
+  });
+
+  it("tells two concepts of one term apart by their scoring settings", () => {
+    expect(scoringLabel(defaults)).toBe("z ≥ 6");
+    expect(scoringLabel({ ...defaults, threshold: 4, trim_ratio: 0.1 })).toBe("z ≥ 4 · R 0.1");
+    expect(scoringLabel({ ...defaults, stored_terms: 1000, root_weight: 1 })).toBe(
+      "z ≥ 6 · 1,000 stored · root 1",
+    );
+    expect(usesScoringDefaults(defaults)).toBe(true);
+    expect(usesScoringDefaults({ ...defaults, trim_ratio: 0.1 })).toBe(false);
   });
 });
 

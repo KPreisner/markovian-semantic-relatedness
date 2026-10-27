@@ -5,6 +5,7 @@ import { ConceptView } from "@/components/concepts/concept-view";
 import { PageHeader } from "@/components/site/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { zGetConceptResponse } from "@/lib/api/zod.gen";
+import { scoringLabel } from "@/lib/format";
 import { load } from "@/lib/server/data";
 
 export const metadata: Metadata = { title: "Concept" };
@@ -29,7 +30,7 @@ async function ConceptContent({
   return (
     <>
       <PageHeader
-        eyebrow={`concept · ${concept.model_id}`}
+        eyebrow={`concept · ${concept.model_id} · ${scoringLabel(concept.params)}`}
         title={<span className="text-gradient font-mono">{concept.root.term}</span>}
         lead="The terms a random walk from the chosen term reaches much sooner than usual: closer to it than they usually are to other terms."
       />

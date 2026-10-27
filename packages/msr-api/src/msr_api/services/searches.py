@@ -1,6 +1,7 @@
 """Search requests: record the search, create its job, publish the task."""
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -10,7 +11,18 @@ from msr.jobs.tasks import SEARCH_TASK
 from msr.search.params import SearchParams
 from msr_api.core.config import ApiSettings
 from msr_api.core.errors import NotFoundError, UnprocessableError
-from msr_api.schemas.searches import Match, Search, SearchHit, SearchRequest, SearchStarted
+from msr_api.schemas.searches import (
+    JobStatus,
+    Match,
+    Search,
+    SearchConceptRef,
+    SearchEntry,
+    SearchHit,
+    SearchIndex,
+    SearchIndexCounts,
+    SearchRequest,
+    SearchStarted,
+)
 from msr_api.services import jobs as job_service
 from msr_api.services.publisher import TaskPublisher
 from msr_db.concepts import AsyncConceptRepository
@@ -70,6 +82,45 @@ async def create_search(
     queued = await AsyncJobRepository(conn).get(job.job_id) or job
     return SearchStarted(
         search_id=search.search_id, job_id=job.job_id, job=await job_service.job_out(conn, queued)
+    )
+
+
+async def search_index(
+    conn: AsyncConnection[Any],
+    *,
+    model_id: str | None,
+    corpus_id: str | None,
+    term: str | None,
+    statuses: Sequence[JobStatus] | None,
+    limit: int,
+    offset: int,
+) -> SearchIndex:
+    repo = AsyncSearchRepository(conn)
+    filters = {"model_id": model_id, "corpus_id": corpus_id, "term": term}
+    rows = await repo.index(**filters, statuses=statuses, limit=limit, offset=offset)
+    counts = await repo.index_counts(**filters)
+    jobs = await AsyncJobRepository(conn).get_many([r.job_id for r in rows])
+    return SearchIndex(
+        entries=[
+            SearchEntry(
+                search_id=r.search_id,
+                model_id=r.model_id,
+                corpus_id=r.corpus_id,
+                concepts=[SearchConceptRef.model_validate(c) for c in r.concepts],
+                params=r.params,
+                created_at=r.created_at,
+                status=cast(JobStatus, r.status),
+                hit_count=r.hit_count,
+                job=job_service.job_from_row(jobs[r.job_id], None),
+            )
+            for r in rows
+        ],
+        counts=SearchIndexCounts(
+            queued=counts.queued,
+            running=counts.running,
+            succeeded=counts.succeeded,
+            failed=counts.failed,
+        ),
     )
 
 

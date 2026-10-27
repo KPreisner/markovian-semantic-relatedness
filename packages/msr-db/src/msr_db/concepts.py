@@ -12,7 +12,15 @@ from psycopg import AsyncConnection, Connection
 from psycopg.rows import class_row
 from psycopg.types.json import Jsonb
 
-from msr_db.rows import ConceptRow, ConceptSummaryRow, ConceptTermRow
+from msr_db.rows import (
+    ConceptIndexCountsRow,
+    ConceptIndexRow,
+    ConceptRow,
+    ConceptSummaryRow,
+    ConceptTermRow,
+)
+
+TOP_TERMS = 6
 
 CONCEPT_GET = "SELECT * FROM msr.concepts WHERE concept_id = %s"
 CONCEPT_FIND = """
@@ -23,6 +31,46 @@ CONCEPT_FOR_ROOT = """
     SELECT concept_id, params, params_hash, created_at, job_id FROM msr.concepts
     WHERE model_id = %s AND root_idx = %s
     ORDER BY created_at, concept_id
+"""
+# The concepts index: every stored concept, plus each concept job that hasn't stored one (queued,
+# running, or failed). A succeeded job always has its concept, so it shows as that concept. `term`
+# matches anywhere in the root, ignoring case, and literally (no LIKE wildcards).
+_INDEX_ENTRIES = """
+    WITH entries AS (
+        SELECT 'ready' AS status, c.concept_id, c.job_id, c.model_id, c.root_idx, c.params,
+            c.created_at, cardinality(c.term_idx) AS term_count, c.term_idx[2:%(top)s] AS top_idx
+        FROM msr.concepts AS c
+        UNION ALL
+        SELECT j.status, NULL, j.job_id, j.model_id, j.root_idx, j.params, j.created_at, NULL, NULL
+        FROM msr.jobs AS j
+        WHERE j.job_type = 'concept' AND j.status IN ('queued', 'running', 'failed')
+    )
+    SELECT e.*, v.term AS root
+    FROM entries AS e
+    JOIN msr.vocab AS v ON v.model_id = e.model_id AND v.term_idx = e.root_idx
+    WHERE (%(model)s::text IS NULL OR e.model_id = %(model)s)
+        AND (%(term)s::text IS NULL OR strpos(lower(v.term), lower(%(term)s)) > 0)
+"""
+CONCEPT_INDEX = f"""
+    SELECT i.status, i.concept_id, i.job_id, i.model_id, i.root_idx, i.root, i.params,
+        i.created_at, i.term_count,
+        (
+            SELECT array_agg(tv.term ORDER BY t.ord)
+            FROM unnest(i.top_idx) WITH ORDINALITY AS t (term_idx, ord)
+            JOIN msr.vocab AS tv ON tv.model_id = i.model_id AND tv.term_idx = t.term_idx
+        ) AS top_terms
+    FROM ({_INDEX_ENTRIES}) AS i
+    WHERE %(statuses)s::text[] IS NULL OR i.status = ANY(%(statuses)s)
+    ORDER BY i.created_at DESC, i.job_id DESC NULLS LAST, i.concept_id DESC
+    LIMIT %(limit)s OFFSET %(offset)s
+"""
+CONCEPT_INDEX_COUNTS = f"""
+    SELECT
+        count(*) FILTER (WHERE status = 'ready')::integer AS ready,
+        count(*) FILTER (WHERE status = 'queued')::integer AS queued,
+        count(*) FILTER (WHERE status = 'running')::integer AS running,
+        count(*) FILTER (WHERE status = 'failed')::integer AS failed
+    FROM ({_INDEX_ENTRIES}) AS i
 """
 CONCEPT_MODELS = """
     SELECT concept_id, model_id FROM msr.concepts WHERE concept_id = ANY(%s)
@@ -68,6 +116,40 @@ class AsyncConceptRepository:
         async with self.conn.cursor(row_factory=class_row(ConceptSummaryRow)) as cur:
             await cur.execute(CONCEPT_FOR_ROOT, (model_id, root_idx))
             return await cur.fetchall()
+
+    async def index(
+        self,
+        *,
+        model_id: str | None = None,
+        term: str | None = None,
+        statuses: Sequence[str] | None = None,
+        limit: int,
+        offset: int = 0,
+    ) -> list[ConceptIndexRow]:
+        """Stored concepts and unfinished or failed concept jobs, newest first."""
+        args = {
+            "model": model_id,
+            "term": term,
+            "statuses": list(statuses) if statuses else None,
+            "top": TOP_TERMS + 1,
+            "limit": limit,
+            "offset": offset,
+        }
+        async with self.conn.cursor(row_factory=class_row(ConceptIndexRow)) as cur:
+            await cur.execute(CONCEPT_INDEX, args)
+            return await cur.fetchall()
+
+    async def index_counts(
+        self, *, model_id: str | None = None, term: str | None = None
+    ) -> ConceptIndexCountsRow:
+        """How many index entries have each status, under the same filters."""
+        async with self.conn.cursor(row_factory=class_row(ConceptIndexCountsRow)) as cur:
+            await cur.execute(
+                CONCEPT_INDEX_COUNTS, {"model": model_id, "term": term, "top": TOP_TERMS + 1}
+            )
+            row = await cur.fetchone()
+            assert row is not None  # an aggregate always returns a row
+            return row
 
     async def models_of(self, concept_ids: Sequence[UUID]) -> dict[UUID, str]:
         """concept id → model id, for the ids that exist."""

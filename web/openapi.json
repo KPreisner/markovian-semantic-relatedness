@@ -196,6 +196,141 @@
         "title": "Concept",
         "type": "object"
       },
+      "ConceptEntry": {
+        "additionalProperties": false,
+        "description": "A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,\nor `failed`.",
+        "properties": {
+          "concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when `ready`",
+            "title": "Concept Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job building it, that failed, or that built it (null for a concept stored without a job)"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "root": {
+            "$ref": "#/components/schemas/RootTerm"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntryStatus"
+          },
+          "term_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ranked terms stored, when `ready`",
+            "title": "Term Count"
+          },
+          "top_terms": {
+            "description": "The top-ranked terms after the root, when `ready`",
+            "items": {
+              "type": "string"
+            },
+            "title": "Top Terms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "concept_id",
+          "model_id",
+          "root",
+          "params",
+          "created_at",
+          "term_count",
+          "top_terms",
+          "job"
+        ],
+        "title": "ConceptEntry",
+        "type": "object"
+      },
+      "ConceptIndex": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ConceptIndexCounts",
+            "description": "Entries with each status under the model and term filters (not `status`)"
+          },
+          "entries": {
+            "description": "Newest first",
+            "items": {
+              "$ref": "#/components/schemas/ConceptEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "counts"
+        ],
+        "title": "ConceptIndex",
+        "type": "object"
+      },
+      "ConceptIndexCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ready",
+          "queued",
+          "running",
+          "failed"
+        ],
+        "title": "ConceptIndexCounts",
+        "type": "object"
+      },
       "ConceptRequest": {
         "additionalProperties": false,
         "description": "A root term plus any concept parameters to override. Omitted parameters take their\ndefaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.\n\nThe reference terms (and so Q) are the model's, fixed when it was built, so there's no `q`.\n`trim_ratio`, `threshold`, `root_weight`, and `stored_terms` only reshape the scoring of the\nroot's walk: changing them reuses an earlier concept's walk of the same root.",
@@ -497,6 +632,15 @@
         ],
         "title": "Corpus",
         "type": "object"
+      },
+      "EntryStatus": {
+        "enum": [
+          "ready",
+          "queued",
+          "running",
+          "failed"
+        ],
+        "type": "string"
       },
       "ErrorDetail": {
         "additionalProperties": false,
@@ -822,6 +966,15 @@
         "$ref": "#/components/schemas/JobEvent",
         "description": "One Server-Sent Event's `data:` from `GET /jobs/{job_id}/events`. In the OpenAPI schema so\nclients (the BFF's Zod union) are generated from the same definition as the worker's.",
         "title": "JobEventData"
+      },
+      "JobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed"
+        ],
+        "type": "string"
       },
       "JobsInfo": {
         "additionalProperties": false,
@@ -1367,6 +1520,109 @@
         "title": "Search",
         "type": "object"
       },
+      "SearchConceptRef": {
+        "additionalProperties": false,
+        "properties": {
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The concept's parameters (null if deleted)",
+            "title": "Params"
+          },
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The concept's chosen term (null if it was deleted)",
+            "title": "Root"
+          }
+        },
+        "required": [
+          "concept_id",
+          "root",
+          "params"
+        ],
+        "title": "SearchConceptRef",
+        "type": "object"
+      },
+      "SearchEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "concepts": {
+            "description": "In the search's order",
+            "items": {
+              "$ref": "#/components/schemas/SearchConceptRef"
+            },
+            "title": "Concepts",
+            "type": "array"
+          },
+          "corpus_id": {
+            "title": "Corpus Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "hit_count": {
+            "description": "Hits stored (the top N)",
+            "title": "Hit Count",
+            "type": "integer"
+          },
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "search_id": {
+            "format": "uuid",
+            "title": "Search Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "The latest job's status"
+          }
+        },
+        "required": [
+          "search_id",
+          "model_id",
+          "corpus_id",
+          "concepts",
+          "params",
+          "created_at",
+          "status",
+          "hit_count",
+          "job"
+        ],
+        "title": "SearchEntry",
+        "type": "object"
+      },
       "SearchHit": {
         "additionalProperties": false,
         "properties": {
@@ -1425,6 +1681,58 @@
           "score"
         ],
         "title": "SearchHit",
+        "type": "object"
+      },
+      "SearchIndex": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/SearchIndexCounts",
+            "description": "Searches with each status under the model, corpus, and term filters (not `status`)"
+          },
+          "entries": {
+            "description": "Newest first",
+            "items": {
+              "$ref": "#/components/schemas/SearchEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "counts"
+        ],
+        "title": "SearchIndex",
+        "type": "object"
+      },
+      "SearchIndexCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "succeeded": {
+            "title": "Succeeded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed"
+        ],
+        "title": "SearchIndexCounts",
         "type": "object"
       },
       "SearchRequest": {
@@ -1620,6 +1928,133 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/concepts": {
+      "get": {
+        "description": "Every stored concept, and every concept job that hasn't stored one (queued, running, or\nfailed), newest first: what's been built, what's building, and what failed and why.",
+        "operationId": "list_concepts",
+        "parameters": [
+          {
+            "description": "Only this model's",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this model's",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "Roots containing this, in any case",
+            "in": "query",
+            "name": "term",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Roots containing this, in any case",
+              "title": "Term"
+            }
+          },
+          {
+            "description": "Only these statuses",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these statuses",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptIndex"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "List Concepts",
+        "tags": [
+          "concepts"
+        ]
+      }
+    },
     "/concepts/{concept_id}": {
       "get": {
         "description": "The ranked concept table, with term strings and counts from the model's vocab.",
@@ -2216,6 +2651,150 @@
       }
     },
     "/searches": {
+      "get": {
+        "description": "Every search, newest first, with its concepts, its latest job, and how many hits it\nstored: what's been searched, what's running, and what failed and why.",
+        "operationId": "list_searches",
+        "parameters": [
+          {
+            "description": "Only this model's",
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this model's",
+              "title": "Model"
+            }
+          },
+          {
+            "description": "Only this corpus's",
+            "in": "query",
+            "name": "corpus",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this corpus's",
+              "title": "Corpus"
+            }
+          },
+          {
+            "description": "Searches with a concept whose chosen term contains this, in any case",
+            "in": "query",
+            "name": "term",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Searches with a concept whose chosen term contains this, in any case",
+              "title": "Term"
+            }
+          },
+          {
+            "description": "Only these statuses",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/JobStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only these statuses",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndex"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such model, term, concept, corpus, search, or job"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request or parameters"
+          }
+        },
+        "summary": "List Searches",
+        "tags": [
+          "searches"
+        ]
+      },
       "post": {
         "description": "Search a corpus with one or more concepts of one model. Returns the search and its job.",
         "operationId": "create_search",

@@ -22,6 +22,11 @@ async def job_out(conn: AsyncConnection[Any], row: JobRow) -> Job:
         term = await AsyncVocabRepository(conn).get(row.model_id, row.root_idx)
         if term is not None:
             root = RootTerm(term_idx=term.term_idx, term=term.term)
+    return job_from_row(row, root)
+
+
+def job_from_row(row: JobRow, root: RootTerm | None) -> Job:
+    """The job as the API returns it, with its root term already looked up."""
     error = JobError(code=row.error_code, message=row.error_message) if row.error_code else None
     return Job(
         job_id=row.job_id,

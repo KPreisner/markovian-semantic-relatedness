@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-// Concepts this browser opened recently, for the workbench and the search builder. A per-viewer
+// Concepts this browser opened recently, for the build page and the search builder. A per-viewer
 // convenience in localStorage: it can be empty or unavailable (private windows), and nothing
 // depends on it.
 
@@ -8,6 +8,9 @@ export type RecentConcept = {
   concept_id: string;
   model_id: string;
   root: string;
+  /** The concept's parameters, to tell concepts of one chosen term apart (missing from entries
+   * remembered before they were recorded). */
+  params?: Record<string, unknown>;
   opened_at: string;
 };
 
@@ -67,22 +70,36 @@ function write(list: RecentConcept[], storage: Storage | undefined): RecentConce
 let pruned = false;
 
 /** Once per page load, check the remembered concepts still exist and forget the ones that
- * don't. At most `LIMIT` small requests (`limit=1`). */
+ * don't, filling in the parameters of entries remembered without them. At most `LIMIT` small
+ * requests (`limit=1`). */
 export async function pruneMissing(fetcher: typeof fetch = fetch): Promise<string[]> {
   if (pruned) return [];
   pruned = true;
-  const checks = await Promise.all(
+  const missing: string[] = [];
+  const params = new Map<string, Record<string, unknown>>();
+  await Promise.all(
     readRecent().map(async (c) => {
       try {
         const response = await fetcher(`/api/concepts/${encodeURIComponent(c.concept_id)}?limit=1`);
-        return response.status === 404 ? c.concept_id : null;
+        if (response.status === 404) missing.push(c.concept_id);
+        else if (response.ok && !c.params) {
+          const body = (await response.json()) as { params?: Record<string, unknown> };
+          if (body.params) params.set(c.concept_id, body.params);
+        }
       } catch {
-        return null; // unreachable is not missing
+        // Unreachable is not missing.
       }
     }),
   );
-  const missing = checks.filter((id): id is string => id !== null);
   if (missing.length) forgetConcepts(missing);
+  if (params.size) {
+    write(
+      readRecent().map((c) =>
+        params.has(c.concept_id) ? { ...c, params: params.get(c.concept_id) } : c,
+      ),
+      safeStorage(),
+    );
+  }
   return missing;
 }
 

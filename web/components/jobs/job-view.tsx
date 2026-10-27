@@ -35,7 +35,7 @@ export function JobView({ job }: { job: Job }) {
       {status === "failed" && (
         <div className="flex gap-3">
           <Button asChild variant="outline">
-            <Link href="/workbench">Back to the workbench</Link>
+            <Link href="/concepts">Back to the concepts</Link>
           </Button>
         </div>
       )}

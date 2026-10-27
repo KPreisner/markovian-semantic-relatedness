@@ -22,6 +22,16 @@ export const zCheck = z.object({
 });
 
 /**
+ * ConceptIndexCounts
+ */
+export const zConceptIndexCounts = z.object({
+    failed: z.int(),
+    queued: z.int(),
+    ready: z.int(),
+    running: z.int()
+});
+
+/**
  * ConceptRequest
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
@@ -79,6 +89,13 @@ export const zCorpus = z.object({
     updated_at: z.iso.datetime({ offset: true })
 });
 
+export const zEntryStatus = z.enum([
+    'ready',
+    'queued',
+    'running',
+    'failed'
+]);
+
 /**
  * ErrorDetail
  */
@@ -111,6 +128,13 @@ export const zJobError = z.object({
     code: z.string(),
     message: z.string().nullable()
 });
+
+export const zJobStatus = z.enum([
+    'queued',
+    'running',
+    'succeeded',
+    'failed'
+]);
 
 /**
  * JobsInfo
@@ -280,6 +304,32 @@ export const zConcept = z.object({
 });
 
 /**
+ * ConceptEntry
+ *
+ * A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,
+ * or `failed`.
+ */
+export const zConceptEntry = z.object({
+    concept_id: z.uuid().nullable(),
+    created_at: z.iso.datetime({ offset: true }),
+    job: zJob.nullable(),
+    model_id: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    root: zRootTerm,
+    status: zEntryStatus,
+    term_count: z.int().nullable(),
+    top_terms: z.array(z.string())
+});
+
+/**
+ * ConceptIndex
+ */
+export const zConceptIndex = z.object({
+    counts: zConceptIndexCounts,
+    entries: z.array(zConceptEntry)
+});
+
+/**
  * ConceptStatus
  *
  * `ready` with a `concept_id` (cached), or `pending` with the `job_id` building it. `job` is
@@ -290,6 +340,30 @@ export const zConceptStatus = z.object({
     job: zJob.nullable(),
     job_id: z.uuid().nullable(),
     status: z.enum(['ready', 'pending'])
+});
+
+/**
+ * SearchConceptRef
+ */
+export const zSearchConceptRef = z.object({
+    concept_id: z.uuid(),
+    params: z.record(z.string(), z.unknown()).nullable(),
+    root: z.string().nullable()
+});
+
+/**
+ * SearchEntry
+ */
+export const zSearchEntry = z.object({
+    concepts: z.array(zSearchConceptRef),
+    corpus_id: z.string(),
+    created_at: z.iso.datetime({ offset: true }),
+    hit_count: z.int(),
+    job: zJob,
+    model_id: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    search_id: z.uuid(),
+    status: zJobStatus
 });
 
 /**
@@ -319,6 +393,24 @@ export const zSearch = z.object({
     model_id: z.string(),
     params: z.record(z.string(), z.unknown()),
     search_id: z.uuid()
+});
+
+/**
+ * SearchIndexCounts
+ */
+export const zSearchIndexCounts = z.object({
+    failed: z.int(),
+    queued: z.int(),
+    running: z.int(),
+    succeeded: z.int()
+});
+
+/**
+ * SearchIndex
+ */
+export const zSearchIndex = z.object({
+    counts: zSearchIndexCounts,
+    entries: z.array(zSearchEntry)
 });
 
 /**
@@ -381,6 +473,19 @@ export const zHealth = z.object({
     ]),
     workers: zWorkersCheck
 });
+
+export const zListConceptsQuery = z.object({
+    model: z.string().min(1).nullish(),
+    term: z.string().min(1).max(200).nullish(),
+    status: z.array(zEntryStatus).nullish(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    offset: z.int().gte(0).optional().default(0)
+});
+
+/**
+ * Successful Response
+ */
+export const zListConceptsResponse = zConceptIndex;
 
 export const zGetConceptPath = z.object({
     concept_id: z.uuid()
@@ -491,6 +596,20 @@ export const zTermsQuery = z.object({
  * Successful Response
  */
 export const zTermsResponse = z.array(zTerm);
+
+export const zListSearchesQuery = z.object({
+    model: z.string().min(1).nullish(),
+    corpus: z.string().min(1).nullish(),
+    term: z.string().min(1).max(200).nullish(),
+    status: z.array(zJobStatus).nullish(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    offset: z.int().gte(0).optional().default(0)
+});
+
+/**
+ * Successful Response
+ */
+export const zListSearchesResponse = zSearchIndex;
 
 export const zCreateSearchBody = zSearchRequest;
 

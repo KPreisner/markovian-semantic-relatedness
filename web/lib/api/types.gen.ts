@@ -120,6 +120,91 @@ export type Concept = {
 };
 
 /**
+ * ConceptEntry
+ *
+ * A stored concept (`ready`), or a concept job that hasn't stored one: `queued`, `running`,
+ * or `failed`.
+ */
+export type ConceptEntry = {
+    /**
+     * Concept Id
+     *
+     * Set when `ready`
+     */
+    concept_id: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * The job building it, that failed, or that built it (null for a concept stored without a job)
+     */
+    job: Job | null;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: unknown;
+    };
+    root: RootTerm;
+    status: EntryStatus;
+    /**
+     * Term Count
+     *
+     * Ranked terms stored, when `ready`
+     */
+    term_count: number | null;
+    /**
+     * Top Terms
+     *
+     * The top-ranked terms after the root, when `ready`
+     */
+    top_terms: Array<string>;
+};
+
+/**
+ * ConceptIndex
+ */
+export type ConceptIndex = {
+    /**
+     * Entries with each status under the model and term filters (not `status`)
+     */
+    counts: ConceptIndexCounts;
+    /**
+     * Entries
+     *
+     * Newest first
+     */
+    entries: Array<ConceptEntry>;
+};
+
+/**
+ * ConceptIndexCounts
+ */
+export type ConceptIndexCounts = {
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Ready
+     */
+    ready: number;
+    /**
+     * Running
+     */
+    running: number;
+};
+
+/**
  * ConceptRequest
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
@@ -307,6 +392,8 @@ export type Corpus = {
     updated_at: string;
 };
 
+export type EntryStatus = 'ready' | 'queued' | 'running' | 'failed';
+
 /**
  * ErrorDetail
  */
@@ -483,6 +570,8 @@ export type JobEvent = ({
  * clients (the BFF's Zod union) are generated from the same definition as the worker's.
  */
 export type JobEventData = JobEvent;
+
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 
 /**
  * JobsInfo
@@ -807,6 +896,75 @@ export type Search = {
 };
 
 /**
+ * SearchConceptRef
+ */
+export type SearchConceptRef = {
+    /**
+     * Concept Id
+     */
+    concept_id: string;
+    /**
+     * Params
+     *
+     * The concept's parameters (null if deleted)
+     */
+    params: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Root
+     *
+     * The concept's chosen term (null if it was deleted)
+     */
+    root: string | null;
+};
+
+/**
+ * SearchEntry
+ */
+export type SearchEntry = {
+    /**
+     * Concepts
+     *
+     * In the search's order
+     */
+    concepts: Array<SearchConceptRef>;
+    /**
+     * Corpus Id
+     */
+    corpus_id: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Hit Count
+     *
+     * Hits stored (the top N)
+     */
+    hit_count: number;
+    job: Job;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Params
+     */
+    params: {
+        [key: string]: unknown;
+    };
+    /**
+     * Search Id
+     */
+    search_id: string;
+    /**
+     * The latest job's status
+     */
+    status: JobStatus;
+};
+
+/**
  * SearchHit
  */
 export type SearchHit = {
@@ -846,6 +1004,44 @@ export type SearchHit = {
      * Score
      */
     score: number;
+};
+
+/**
+ * SearchIndex
+ */
+export type SearchIndex = {
+    /**
+     * Searches with each status under the model, corpus, and term filters (not `status`)
+     */
+    counts: SearchIndexCounts;
+    /**
+     * Entries
+     *
+     * Newest first
+     */
+    entries: Array<SearchEntry>;
+};
+
+/**
+ * SearchIndexCounts
+ */
+export type SearchIndexCounts = {
+    /**
+     * Failed
+     */
+    failed: number;
+    /**
+     * Queued
+     */
+    queued: number;
+    /**
+     * Running
+     */
+    running: number;
+    /**
+     * Succeeded
+     */
+    succeeded: number;
 };
 
 /**
@@ -947,6 +1143,62 @@ export type WorkersCheck = {
      */
     status: 'ok' | 'none' | 'unknown';
 };
+
+export type ListConceptsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Model
+         *
+         * Only this model's
+         */
+        model?: string | null;
+        /**
+         * Term
+         *
+         * Roots containing this, in any case
+         */
+        term?: string | null;
+        /**
+         * Status
+         *
+         * Only these statuses
+         */
+        status?: Array<EntryStatus> | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/concepts';
+};
+
+export type ListConceptsErrors = {
+    /**
+     * No such model, term, concept, corpus, search, or job
+     */
+    404: ErrorResponse;
+    /**
+     * Invalid request or parameters
+     */
+    422: ErrorResponse;
+};
+
+export type ListConceptsError = ListConceptsErrors[keyof ListConceptsErrors];
+
+export type ListConceptsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConceptIndex;
+};
+
+export type ListConceptsResponse = ListConceptsResponses[keyof ListConceptsResponses];
 
 export type GetConceptData = {
     body?: never;
@@ -1312,6 +1564,68 @@ export type TermsResponses = {
 };
 
 export type TermsResponse = TermsResponses[keyof TermsResponses];
+
+export type ListSearchesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Model
+         *
+         * Only this model's
+         */
+        model?: string | null;
+        /**
+         * Corpus
+         *
+         * Only this corpus's
+         */
+        corpus?: string | null;
+        /**
+         * Term
+         *
+         * Searches with a concept whose chosen term contains this, in any case
+         */
+        term?: string | null;
+        /**
+         * Status
+         *
+         * Only these statuses
+         */
+        status?: Array<JobStatus> | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/searches';
+};
+
+export type ListSearchesErrors = {
+    /**
+     * No such model, term, concept, corpus, search, or job
+     */
+    404: ErrorResponse;
+    /**
+     * Invalid request or parameters
+     */
+    422: ErrorResponse;
+};
+
+export type ListSearchesError = ListSearchesErrors[keyof ListSearchesErrors];
+
+export type ListSearchesResponses = {
+    /**
+     * Successful Response
+     */
+    200: SearchIndex;
+};
+
+export type ListSearchesResponse = ListSearchesResponses[keyof ListSearchesResponses];
 
 export type CreateSearchData = {
     body: SearchRequest;

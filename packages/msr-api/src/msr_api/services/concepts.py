@@ -9,7 +9,8 @@ Outcomes 2 and 3 are one `INSERT … ON CONFLICT DO NOTHING` against the partial
 active concept jobs, so concurrent identical requests can't start two jobs.
 """
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -22,10 +23,14 @@ from msr_api.core.config import ApiSettings
 from msr_api.core.errors import NotFoundError, ServiceUnavailableError, UnprocessableError
 from msr_api.schemas.concepts import (
     Concept,
+    ConceptEntry,
+    ConceptIndex,
+    ConceptIndexCounts,
     ConceptRequest,
     ConceptStatus,
     ConceptSummary,
     ConceptTerm,
+    EntryStatus,
 )
 from msr_api.schemas.jobs import Job, RootTerm
 from msr_api.services import jobs as job_service
@@ -133,6 +138,48 @@ async def builder_job(conn: AsyncConnection[Any], job_id: UUID | None) -> Job | 
         return None
     row = await AsyncJobRepository(conn).get(job_id)
     return await job_service.job_out(conn, row) if row else None
+
+
+async def concept_index(
+    conn: AsyncConnection[Any],
+    *,
+    model_id: str | None,
+    term: str | None,
+    statuses: Sequence[EntryStatus] | None,
+    limit: int,
+    offset: int,
+) -> ConceptIndex:
+    if model_id is not None:
+        await get_model(conn, model_id)
+    repo = AsyncConceptRepository(conn)
+    rows = await repo.index(
+        model_id=model_id, term=term, statuses=statuses, limit=limit, offset=offset
+    )
+    counts = await repo.index_counts(model_id=model_id, term=term)
+    jobs = await AsyncJobRepository(conn).get_many([r.job_id for r in rows if r.job_id])
+    entries = []
+    for r in rows:
+        root = RootTerm(term_idx=r.root_idx, term=r.root)
+        job = jobs.get(r.job_id) if r.job_id else None
+        entries.append(
+            ConceptEntry(
+                status=cast(EntryStatus, r.status),
+                concept_id=r.concept_id,
+                model_id=r.model_id,
+                root=root,
+                params=r.params,
+                created_at=r.created_at,
+                term_count=r.term_count,
+                top_terms=r.top_terms or [],
+                job=job_service.job_from_row(job, root) if job else None,
+            )
+        )
+    return ConceptIndex(
+        entries=entries,
+        counts=ConceptIndexCounts(
+            ready=counts.ready, queued=counts.queued, running=counts.running, failed=counts.failed
+        ),
+    )
 
 
 async def concepts_for_root(
