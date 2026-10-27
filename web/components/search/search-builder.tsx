@@ -173,7 +173,7 @@ export function SearchBuilder({
                 value={term}
                 onValueChange={setTerm}
                 onPick={addTerm}
-                placeholder="Add a concept by its root term"
+                placeholder="Add a concept by its chosen term"
               />
             </div>
             <Button
@@ -187,8 +187,9 @@ export function SearchBuilder({
           </div>
           {chips.length > 1 && (
             <p className="text-sm text-muted-foreground">
-              With several concepts, a paragraph&apos;s score is the geometric mean of each
-              concept&apos;s score, so it has to fit all of them.
+              With several concepts, a chunk&apos;s score is the geometric mean of each
+              concept&apos;s score, so a chunk ranks high only if it&apos;s relevant to every
+              concept.
             </p>
           )}
           {suggestions.length > 0 && (

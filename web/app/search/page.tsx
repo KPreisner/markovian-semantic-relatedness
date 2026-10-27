@@ -19,7 +19,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
             Rank text by <em className="text-gradient pr-1">meaning</em>
           </>
         }
-        lead="Each concept's top-weighted terms are matched as plain substrings in every paragraph of the corpus, so nothing is tokenized or indexed ahead of time."
+        lead="Each concept's top-weighted terms are matched as plain substrings in every chunk of the corpus, so nothing is tokenized or indexed ahead of time."
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <Suspense fallback={<Skeleton className="h-96 rounded-3xl" />}>

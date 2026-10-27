@@ -81,7 +81,7 @@ export function TermCombobox({
         placeholder={placeholder ?? "A term, e.g. trumpet"}
         autoFocus={autoFocus}
         className="font-mono text-base"
-        aria-label="Root term"
+        aria-label="Chosen term"
       />
       {open && value && suggestions.length > 0 && (
         <CommandList className="absolute top-full z-50 mt-1 w-full rounded-xl border bg-popover p-1 shadow-xl">

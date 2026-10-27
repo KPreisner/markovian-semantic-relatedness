@@ -6,7 +6,14 @@ import numpy as np
 import pytest
 
 from msr.concept.build import ConceptParams, build_concept
-from msr.concept.storage import CONCEPT_VERSION, concept_key, load_concept, save_concept
+from msr.concept.storage import (
+    CONCEPT_VERSION,
+    concept_dir_name,
+    concept_key,
+    load_concept,
+    save_concept,
+    saved_walk,
+)
 from msr.model.artifacts import (
     ModelManifest,
     built_reference_steps,
@@ -93,3 +100,34 @@ def test_concept_key_tracks_the_version(monkeypatch: pytest.MonkeyPatch) -> None
     before = concept_key(ConceptParams())
     monkeypatch.setattr("msr.concept.storage.CONCEPT_VERSION", CONCEPT_VERSION + 1)
     assert concept_key(ConceptParams()) != before
+
+
+def test_a_concept_from_a_reused_walk_equals_a_walked_one(model: Model) -> None:
+    """v depends only on the model, root, and λ: a concept that differs in its scoring can skip
+    the walk and come out identical."""
+    references = compute_references(model, DegreeMean(), steps=50)
+    root = model.vocab.id("cat")
+    first = build_concept(model, root, references, ConceptParams(steps=50))
+    rescored = ConceptParams(steps=50, threshold=-100.0, trim_ratio=0.1)
+    walked = build_concept(model, root, references, rescored)
+    reused = build_concept(model, root, references, rescored, walk=first.v)
+    for name in ("v", "z", "term_idx", "weight", "cooccur"):
+        np.testing.assert_array_equal(getattr(reused, name), getattr(walked, name))
+    with pytest.raises(ValueError, match="shape"):
+        build_concept(model, root, references, rescored, walk=first.v[:3])
+
+
+def test_saved_walks_are_found_by_root_and_steps(model: Model, tmp_path: Path) -> None:
+    references = compute_references(model, DegreeMean(), steps=50)
+    cat = model.vocab.id("cat")
+    concept = build_concept(model, cat, references, ConceptParams(steps=50))
+    save_concept(concept, tmp_path / concept_dir_name(cat, concept.params))
+    walk = saved_walk(tmp_path, cat, 50)
+    assert walk is not None
+    np.testing.assert_array_equal(walk, concept.v)
+    assert saved_walk(tmp_path, cat, 49) is None  # another λ
+    assert saved_walk(tmp_path, model.vocab.id("dog"), 50) is None  # another root
+    # cat is term 3: a directory for term 31 ("31-…") is never taken for it.
+    assert cat == 3
+    (tmp_path / concept_dir_name(cat, concept.params)).rename(tmp_path / "31-0000000000000000")
+    assert saved_walk(tmp_path, cat, 50) is None

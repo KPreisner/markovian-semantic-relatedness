@@ -31,7 +31,7 @@ async function ConceptContent({
       <PageHeader
         eyebrow={`concept · ${concept.model_id}`}
         title={<span className="text-gradient font-mono">{concept.root.term}</span>}
-        lead="The terms a random walk from the root reaches unusually soon, compared with their typical distance to the reference terms."
+        lead="The terms a random walk from the chosen term reaches much sooner than usual: closer to it than they usually are to other terms."
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <ConceptView concept={concept} />

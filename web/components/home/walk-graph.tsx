@@ -165,8 +165,8 @@ export function WalkGraph({ className }: { className?: string }) {
         <span className="font-mono text-foreground">cat</span> reach{" "}
         <span className="font-mono text-foreground">fat</span>,{" "}
         <span className="font-mono text-foreground">in</span>, and{" "}
-        <span className="font-mono text-foreground">hat</span> unusually soon, compared with how far
-        they are from the reference terms: cat&apos;s concept.
+        <span className="font-mono text-foreground">hat</span> sooner than walks from elsewhere in
+        the graph do: they&apos;re cat&apos;s concept.
       </figcaption>
     </figure>
   );

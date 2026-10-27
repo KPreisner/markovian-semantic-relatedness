@@ -19,7 +19,7 @@ export default function WorkbenchPage() {
             Build a <em className="text-gradient pr-1">concept</em>
           </>
         }
-        lead="Pick a model and a root term. A cached concept opens at once; a new one is walked by a worker while you watch."
+        lead="Pick a model and a chosen term. A cached concept opens at once; a new one is walked by a worker while you watch."
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
         <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>

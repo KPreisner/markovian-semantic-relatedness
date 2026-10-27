@@ -42,8 +42,8 @@ async function SearchContent({ params }: { params: PageProps<"/searches/[searchI
         title={<span className="text-gradient font-mono">{roots}</span>}
         lead={
           concepts.length > 1
-            ? "Paragraphs scored by the geometric mean of each concept's score: a hit has to fit every concept."
-            : "Paragraphs scored by the summed weights of the concept terms they contain, each term counted once."
+            ? "Chunks scored by the geometric mean of each concept's score: a chunk ranks high only if it's relevant to every concept."
+            : "Chunks scored by the summed weights of the concept terms they contain (each term counts once per chunk, as in the paper)."
         }
       />
       <div className="mx-auto w-full max-w-6xl px-4 py-10">

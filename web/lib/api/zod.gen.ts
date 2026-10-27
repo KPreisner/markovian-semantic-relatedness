@@ -26,9 +26,12 @@ export const zCheck = z.object({
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
  * defaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.
+ *
+ * The reference terms (and so Q) are the model's, fixed when it was built, so there's no `q`.
+ * `trim_ratio`, `threshold`, `root_weight`, and `stored_terms` only reshape the scoring of the
+ * root's walk: changing them reuses an earlier concept's walk of the same root.
  */
 export const zConceptRequest = z.object({
-    q: z.int().nullish(),
     refs: z.string().nullish(),
     root: z.string().min(1),
     root_weight: z.number().nullish(),

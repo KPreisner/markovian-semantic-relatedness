@@ -39,8 +39,8 @@ async function JobContent({ params }: { params: PageProps<"/jobs/[jobId]">["para
         }
         lead={
           job.job_type === "concept"
-            ? "A worker walks the co-occurrence graph from the root, then scores every term against the reference terms."
-            : "A worker scans the corpus for the concepts' terms, paragraph by paragraph."
+            ? "A worker walks the co-occurrence graph from the chosen term, then compares every term's distance with its usual distance to the comparison terms."
+            : "A worker scans the corpus for the concepts' terms, chunk by chunk."
         }
       />
       <div className="mx-auto w-full max-w-4xl px-4 py-10">

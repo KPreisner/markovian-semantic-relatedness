@@ -90,7 +90,8 @@ export function ConceptView({ concept: initial }: { concept: Concept }) {
       <section aria-label="Ranked terms" className="overflow-hidden rounded-3xl border bg-card">
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            Ranked by co-occurrence with the root, then by z. Weights are scaled so the root is 100.
+            Ranked by how often each term appears with the chosen term, then by how much closer than
+            usual it is. Weights are scaled so the chosen term is 100.
           </p>
           <Input
             value={filter}

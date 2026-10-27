@@ -89,14 +89,25 @@ def build_concept(
     *,
     backend: WalkBackend | None = None,
     progress: Progress | None = None,
+    walk: NDArray[np.float64] | None = None,
 ) -> Concept:
+    """`walk` is the root's v (Eq. 18) at `params.steps` from an earlier concept (`saved_walk`):
+    v depends only on the model, the root, and λ, so a concept that differs only in its scoring
+    (trim ratio, threshold, root weight, stored terms, or reference strategy) skips the walk."""
     params = params or ConceptParams()
     if params.refs != references.strategy:
         raise ValueError(f"references use {references.strategy}, not {params.refs}")
     if params.steps != references.steps:
         raise ValueError(f"X′ was walked with λ = {references.steps}, not {params.steps}")
     refs, xprime, dropped = reference_columns(model, root, references, params.q, backend=backend)
-    v = hitting_times(model, [root], steps=params.steps, backend=backend, progress=progress)[:, 0]
+    if walk is None:
+        v = hitting_times(model, [root], steps=params.steps, backend=backend, progress=progress)[
+            :, 0
+        ]
+    elif walk.shape != (len(model.vocab),):
+        raise ValueError(f"the walk has shape {walk.shape}, not ({len(model.vocab)},)")
+    else:
+        v = walk
     mu, sigma = trimmed_stats(xprime, trim_count(params.trim_ratio, len(refs)))
     z = negated_z(v, mu, sigma)
     cooccur = model.c[[root], :].toarray()[0].astype(np.int64)

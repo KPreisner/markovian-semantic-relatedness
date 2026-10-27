@@ -11,19 +11,19 @@ import { load } from "@/lib/server/data";
 const STEPS = [
   {
     title: "Count co-occurrence",
-    body: "Every paragraph of the source is a bag of terms. Terms that share one are joined, and the counts make a sparse graph over the whole vocabulary.",
+    body: "The source text is split into chunks (here, Wikipedia paragraphs), and each chunk becomes a set of terms. Terms that appear in the same chunk are linked, and the counts make a graph over the whole vocabulary.",
   },
   {
-    title: "Walk from the root",
-    body: "A random walk spreads out from the root term, step by step. Each term's expected hitting time says how close it is to the root.",
+    title: "Walk from the chosen term",
+    body: "A random walk spreads out from the chosen term, step by step. How soon it reaches each term measures how close that term is to the chosen one.",
   },
   {
-    title: "Compare with reference terms",
-    body: "Hitting times to a few dozen reference terms give each term's usual distance. Terms unusually close to the root, in standard deviations, form its concept.",
+    title: "Measure against comparison terms",
+    body: "The model also walks from about 50 comparison terms spread across the graph, which tells it how far each term usually is from everything. Terms much closer to the chosen term than they usually are to other terms form its concept.",
   },
   {
-    title: "Search raw text",
-    body: "The concept's weighted terms are matched in untokenized text, paragraph by paragraph. Several concepts combine by geometric mean, so a hit has to fit all of them.",
+    title: "Semantically search raw text",
+    body: "The concept's weighted terms are matched directly in raw, untokenized text, chunk by chunk. Several concepts combine by geometric mean, so a chunk ranks high only if it's relevant to every concept.",
   },
 ];
 
@@ -45,8 +45,10 @@ export default function Home() {
             </h1>
             <p className="max-w-xl text-lg text-muted-foreground">
               Give it a word. A random walk across a co-occurrence graph finds the terms that sit
-              unusually close to it: its concept. Then it ranks paragraphs anywhere by that concept,
-              with no embeddings and no training on the text being searched.
+              closer to it than they usually are to anything else: its concept, a query expansion
+              with intuitive weights. Then it runs a ranked semantic search of any raw text with
+              that concept, scoring chunks of whatever size you choose (here, paragraphs). No
+              embeddings, no tokenizing, no index, no training on the text being searched.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button

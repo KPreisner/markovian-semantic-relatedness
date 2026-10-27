@@ -16,7 +16,13 @@ from pathlib import Path
 import orjson
 
 from msr.concept.build import Concept, ConceptParams, build_concept
-from msr.concept.storage import concept_dir_name, concept_key, load_concept, save_concept
+from msr.concept.storage import (
+    concept_dir_name,
+    concept_key,
+    load_concept,
+    save_concept,
+    saved_walk,
+)
 from msr.model.artifacts import load_references, references_dir
 from msr.model.build import Model
 from msr.search.scanner import Match, SearchResult, search, search_concept
@@ -65,7 +71,10 @@ def get_concept(
         if step % 100 == 0 or step == total:
             log(f"concept {term!r}: step {step}/{total}, {time.monotonic() - start:.0f} s")
 
-    concept = build_concept(model, root, references, params, progress=progress)
+    walk = saved_walk(concepts_root / model_dir.name, root, params.steps)
+    if walk is not None:
+        log(f"concept {term!r}: reusing the walk of an earlier concept (same λ)")
+    concept = build_concept(model, root, references, params, progress=progress, walk=walk)
     directory.parent.mkdir(parents=True, exist_ok=True)
     save_concept(concept, directory)
     write_concept_tsv(model, concept, directory)

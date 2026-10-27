@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 // The concept defaults (msr.concept.build.ConceptParams); a field is sent only when changed, so
 // the API fills the rest and identical requests share a cache key.
-const DEFAULTS = { threshold: 6, q: 50, trim_ratio: 0.2, stored_terms: 5000 };
+const DEFAULTS = { threshold: 6, trim_ratio: 0.2, stored_terms: 5000 };
 type Advanced = typeof DEFAULTS;
 
 export function Workbench({ models }: { models: ModelSummary[] }) {
@@ -144,7 +144,7 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
             id="term-heading"
             className="font-sans text-sm font-semibold tracking-widest text-muted-foreground uppercase"
           >
-            2 · Root term
+            2 · Chosen term
           </h2>
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1 rounded-xl border bg-card px-1">
@@ -200,62 +200,83 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
               <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
               Advanced parameters
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3 grid gap-4 rounded-2xl border bg-card p-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
-                <Label>Reference strategy</Label>
-                <Select value={refs} onValueChange={setRefs}>
-                  <SelectTrigger className="font-mono">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {strategies.map((s) => (
-                      <SelectItem key={s} value={s} className="font-mono">
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Walk steps λ</Label>
-                <Input
-                  value={model?.reference_steps[refs] ?? ""}
-                  readOnly
-                  disabled
-                  className="font-mono"
-                />
+            <CollapsibleContent className="mt-3 flex flex-col gap-5 rounded-2xl border bg-card p-4">
+              <fieldset className="flex flex-col gap-3">
+                <legend className="mb-2 text-sm font-medium">Set when the model was built</legend>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Reference strategy</Label>
+                    <Select value={refs} onValueChange={setRefs}>
+                      <SelectTrigger className="font-mono">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {strategies.map((s) => (
+                          <SelectItem key={s} value={s} className="font-mono">
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      How the comparison terms were picked. Only the strategies built for this model
+                      are offered.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Walk steps λ</Label>
+                    <Input
+                      value={model?.reference_steps[refs] ?? ""}
+                      readOnly
+                      disabled
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The chosen term is walked as many steps as the comparison terms were, so their
+                      distances compare.
+                    </p>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Fixed: the λ this strategy&apos;s reference walks used.
+                  The comparison terms and their walks are part of the model, so their number
+                  isn&apos;t a setting here.
                 </p>
-              </div>
-              <NumberField
-                label="z threshold"
-                value={advanced.threshold}
-                step={0.5}
-                onChange={(v) => setAdvanced({ ...advanced, threshold: v })}
-              />
-              <NumberField
-                label="Reference columns Q"
-                value={advanced.q}
-                step={1}
-                min={1}
-                onChange={(v) => setAdvanced({ ...advanced, q: v })}
-              />
-              <NumberField
-                label="Trim ratio R"
-                value={advanced.trim_ratio}
-                step={0.05}
-                min={0}
-                max={0.95}
-                onChange={(v) => setAdvanced({ ...advanced, trim_ratio: v })}
-              />
-              <NumberField
-                label="Stored terms"
-                value={advanced.stored_terms}
-                step={100}
-                min={1}
-                onChange={(v) => setAdvanced({ ...advanced, stored_terms: v })}
-              />
+              </fieldset>
+              <fieldset className="flex flex-col gap-3">
+                <legend className="mb-2 text-sm font-medium">
+                  Scoring{" "}
+                  <span className="font-normal text-muted-foreground">
+                    · quick to change once a term has been walked: its walk is reused, only the
+                    scoring is redone
+                  </span>
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <NumberField
+                    label="z threshold"
+                    hint="How much closer than usual a term must be to the chosen term to join, in standard deviations of its distances to the comparison terms. Lower keeps more terms."
+                    value={advanced.threshold}
+                    step={0.5}
+                    onChange={(v) => setAdvanced({ ...advanced, threshold: v })}
+                  />
+                  <NumberField
+                    label="Trim ratio R"
+                    hint="Share of each term's comparison-term distances ignored as outliers (the furthest from typical) when working out its usual distance."
+                    value={advanced.trim_ratio}
+                    step={0.05}
+                    min={0}
+                    max={0.95}
+                    onChange={(v) => setAdvanced({ ...advanced, trim_ratio: v })}
+                  />
+                  <NumberField
+                    label="Stored terms"
+                    hint="Where the ranked list is cut. Searches use each concept's top terms anyway."
+                    value={advanced.stored_terms}
+                    step={100}
+                    min={1}
+                    onChange={(v) => setAdvanced({ ...advanced, stored_terms: v })}
+                  />
+                </div>
+              </fieldset>
             </CollapsibleContent>
           </Collapsible>
         </section>
@@ -308,6 +329,7 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
 
 function NumberField(props: {
   label: string;
+  hint: string;
   value: number;
   step: number;
   min?: number;
@@ -329,6 +351,7 @@ function NumberField(props: {
           if (!Number.isNaN(v)) props.onChange(v);
         }}
       />
+      <p className="text-xs text-muted-foreground">{props.hint}</p>
     </div>
   );
 }

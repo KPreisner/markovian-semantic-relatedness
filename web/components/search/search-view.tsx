@@ -80,8 +80,7 @@ export function SearchView({ search, concepts }: { search: Search; concepts: Sea
 
       {!running && job?.status === "succeeded" && search.hits.length === 0 && (
         <p className="rounded-3xl border bg-card p-8 text-center text-muted-foreground">
-          No paragraph in <span className="font-mono">{search.corpus_id}</span> matched these
-          concepts.
+          No chunk in <span className="font-mono">{search.corpus_id}</span> matched these concepts.
         </p>
       )}
 
@@ -173,7 +172,7 @@ function HitCard({
             {hit.doc_id}
           </span>
           <span>
-            {hit.file_path} · paragraph {hit.chunk_index}
+            {hit.file_path} · chunk {hit.chunk_index}
           </span>
           <span>
             {formatCount(matched.length)} term{matched.length === 1 ? "" : "s"}:{" "}
