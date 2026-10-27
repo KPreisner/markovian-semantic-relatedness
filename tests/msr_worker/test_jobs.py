@@ -91,6 +91,21 @@ def test_a_cached_concept_is_reused_without_walking(
     assert built_by == first  # the job that found it cached didn't build it
 
 
+def test_rescoring_a_concept_reuses_its_walk(runtime: Runtime, clean: DatabaseSettings) -> None:
+    """Only the threshold and trim ratio differ: the root's walk is the same, so the second job
+    scores the first one's walk instead of walking again."""
+    first = insert_concept_job(clean, "cat", default_params())
+    run(runtime, first)
+    assert "walk" in {e.phase for e in events(runtime, first) if isinstance(e, ProgressEvent)}
+    second = insert_concept_job(clean, "cat", default_params(threshold=-100.0, trim_ratio=0.1))
+    run(runtime, second)
+    progress = [e for e in events(runtime, second) if isinstance(e, ProgressEvent)]
+    assert [(e.phase, e.message) for e in progress] == [("score", "reusing the walk from 'cat'")]
+    assert load(runtime, second).status == "succeeded"
+    sizes = sorted(len(weights) for _, _, weights, _ in concept_rows(clean))
+    assert len(sizes) == 2 and sizes[0] < sizes[1]  # a lower threshold keeps more terms
+
+
 def test_saved_files_are_reused_when_the_row_is_missing(
     runtime: Runtime, clean: DatabaseSettings
 ) -> None:

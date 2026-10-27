@@ -3,6 +3,11 @@
 The MSR UI and its BFF (Next.js App Router). See the root README for the tasks; Node runs only in
 containers (`task web:*`).
 
+- `app/` pages: `/` (landing), `/workbench`, `/jobs/[jobId]`, `/concepts/[conceptId]`, `/search`,
+  `/searches/[searchId]`, `/health`. Each is a static shell with its data in `<Suspense>`: server
+  components load through `lib/server/data.ts`; client components (in `components/`) call the
+  BFF and follow jobs with `lib/client/use-job-events.ts`.
+- `app/globals.css`: the design tokens (light and dark, ten concept colors) and utilities.
 - `app/api/**/route.ts`: the BFF. Each handler forwards one API operation and validates the
   response with its generated Zod schema. `app/api/jobs/[jobId]/events` relays job progress (SSE).
 - `app/healthz`: the container's liveness check.

@@ -10,6 +10,7 @@ export function job(fields: Partial<Job> = {}): Job {
     job_type: "concept",
     status: "queued",
     model_id: "simplewiki-small",
+    root: { term_idx: 471414, term: "trumpet" },
     params: { steps: 100 },
     progress: null,
     result_id: null,

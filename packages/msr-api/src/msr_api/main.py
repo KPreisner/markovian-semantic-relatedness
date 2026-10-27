@@ -24,6 +24,7 @@ from msr_api.middleware.correlation_id import CorrelationIdMiddleware
 from msr_api.middleware.response_logging import ResponseLoggingMiddleware
 from msr_api.routers import concepts, corpora, health, jobs, models, searches
 from msr_api.services.broker import BrokerMonitor, CeleryMonitor
+from msr_api.services.health import ReportCache
 from msr_api.services.publisher import CeleryPublisher, TaskPublisher, celery_app
 from msr_db.settings import DatabaseSettings
 
@@ -55,6 +56,20 @@ TAGS = [
     {"name": "jobs", "description": "Job status and progress (Server-Sent Events)"},
     {"name": "health", "description": "Liveness of Postgres and Redis"},
 ]
+
+
+async def check_or_sweep(
+    pool: AsyncConnectionPool[AsyncConnection[Any]], conn: AsyncConnection[Any]
+) -> None:
+    """Check a connection before the pool lends it. After Postgres restarts (e.g. task db:reset)
+    every idle connection is dead; the pool would check them one at a time with a growing backoff
+    (1 s, 2 s, 4 s…) and time out. So the first failure sweeps the pool, dropping every broken
+    connection, and the retry gets a fresh one."""
+    try:
+        await AsyncConnectionPool.check_connection(conn)
+    except Exception:
+        await pool.check()
+        raise
 
 
 def openapi_schema(app: FastAPI) -> dict[str, Any]:
@@ -100,6 +115,7 @@ def create_app(
             db.conninfo("api"),
             min_size=settings.db_pool_min,
             max_size=settings.db_pool_max,
+            check=lambda conn: check_or_sweep(pool, conn),
             open=False,
         )
         await pool.open(wait=True, timeout=30)
@@ -110,13 +126,16 @@ def create_app(
             decode_responses=True,
             socket_timeout=settings.sse_block_ms / 1000 + 5,
         )
+        # Separate apps, so separate connection pools: health checks can't starve publishing.
         broker = celery_app(settings)
+        monitoring = celery_app(settings)
         app.state.started = time.monotonic()
+        app.state.health_cache = ReportCache(settings.health_cache_seconds)
         app.state.settings = settings
         app.state.pool = pool
         app.state.redis = redis
         app.state.publisher = publisher or CeleryPublisher(broker)
-        app.state.monitor = monitor or CeleryMonitor(broker)
+        app.state.monitor = monitor or CeleryMonitor(monitoring)
         log.info("api_started", database=db.name, user=db.user("api"))
         try:
             yield
@@ -124,6 +143,7 @@ def create_app(
             await redis.aclose()
             await pool.close()
             broker.close()
+            monitoring.close()
 
     app = FastAPI(
         title="Markovian Semantic Relatedness API",

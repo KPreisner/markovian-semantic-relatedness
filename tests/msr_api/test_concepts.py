@@ -39,6 +39,7 @@ def test_a_new_concept_queues_one_job(client: httpx.Client, api: RunningApi) -> 
         [],
     )
     assert body["job"]["compute_seconds"] is None
+    assert body["job"]["root"] == {"term_idx": 3, "term": "cat"}  # what the job is building
     row = job(api, body["job_id"])
     assert (row["job_type"], row["status"], row["root_idx"]) == ("concept", "queued", 3)
     assert row["params_hash"] == concept_key(default_params())
@@ -61,7 +62,7 @@ def test_omitted_and_explicit_defaults_are_the_same_concept(client: httpx.Client
     implicit = client.post(URL, json={"root": "hat"}).json()
     explicit = client.post(
         URL,
-        json={"root": "hat", "refs": "degree-mean", "steps": STEPS, "threshold": 6, "q": 50},
+        json={"root": "hat", "refs": "degree-mean", "steps": STEPS, "threshold": 6},
     ).json()
     other = client.post(URL, json={"root": "hat", "threshold": 3}).json()
     assert explicit["job_id"] == implicit["job_id"]
@@ -152,11 +153,13 @@ def test_unknown_roots_models_and_strategies(client: httpx.Client) -> None:
 
 
 def test_invalid_parameters_are_rejected(client: httpx.Client) -> None:
-    response = client.post(URL, json={"root": "cat", "q": 0})
+    response = client.post(URL, json={"root": "cat", "trim_ratio": 1.5})
     assert response.status_code == 422
     error = response.json()["error"]
     assert error["message"] == "invalid concept parameters"
-    assert error["details"][0]["loc"] == ["q"]
+    assert error["details"][0]["loc"] == ["trim_ratio"]
+    # The reference terms are the model's: Q isn't a request parameter.
+    assert client.post(URL, json={"root": "cat", "q": 30}).status_code == 422
     unknown_field = client.post(URL, json={"root": "cat", "lambda": 3})
     assert unknown_field.status_code == 422
 

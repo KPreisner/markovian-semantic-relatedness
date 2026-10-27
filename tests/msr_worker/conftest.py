@@ -4,11 +4,19 @@ from pathlib import Path
 
 import pytest
 
+from msr.service.logging import configure_logging
 from msr_db.settings import DatabaseSettings
 from msr_worker.runtime import Runtime
 from msr_worker.settings import WorkerSettings
 from tests.fixtures.api import clear_jobs
 from tests.fixtures.worker import seed_slow_model, write_data
+
+
+@pytest.fixture(scope="session", autouse=True)
+def logging_like_the_worker() -> None:
+    """Route structlog through stdlib logging, as the worker does (signals.setup_logging), so
+    `caplog` sees the worker's lines whatever ran before."""
+    configure_logging("INFO", "STANDARD")
 
 
 @pytest.fixture(scope="session")

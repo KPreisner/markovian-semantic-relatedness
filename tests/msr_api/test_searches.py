@@ -23,6 +23,7 @@ def test_a_search_records_itself_and_queues_a_job(client: httpx.Client, api: Run
     assert started["job"]["job_id"] == started["job_id"]
     assert (started["job"]["status"], started["job"]["attempts"]) == ("queued", 0)
     assert started["job"]["compute_seconds"] is None and started["job"]["warnings"] == []
+    assert started["job"]["root"] is None  # searches have no root
     search = client.get(f"/searches/{started['search_id']}").json()
     assert search["model_id"] == MODEL_ID and search["corpus_id"] == CORPUS_ID
     assert search["concept_ids"] == [str(cat), str(hat)]

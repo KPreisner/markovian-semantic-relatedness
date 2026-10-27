@@ -1,4 +1,5 @@
-"""Concept cache keys and concept artifacts (`data/concepts/<model_id>/<concept_id>/`).
+"""Concept cache keys and concept artifacts (`data/concepts/<model_id>/<root>-<key>/`, `<key>`
+being the first 16 hex digits of the cache key).
 
 - `params.json`: root, cache key, and parameters
 - `v.npy`, `z.npy`: raw vectors over all N terms, NaN outside the root's component
@@ -12,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import orjson
+from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict
 
 from msr.concept.build import Concept, ConceptParams
@@ -45,6 +47,28 @@ class _RefsFile(BaseModel):
 
     refs: list[int]
     dropped: int
+
+
+def saved_walk(model_concepts: Path, root: int, steps: int) -> NDArray[np.float64] | None:
+    """The root's walk (`v.npy`) from any concept saved for it in `model_concepts` (one model's
+    concept directory) with the same λ and `CONCEPT_VERSION`. A concept's other parameters only
+    score that walk, so any of them will do. None if there's no such concept."""
+    for directory in sorted(model_concepts.glob(f"{root}-*")):
+        if directory.name.endswith(".tmp"):
+            continue
+        try:
+            meta = _ParamsFile.model_validate_json((directory / "params.json").read_bytes())
+            if (meta.root, meta.concept_version, meta.params.steps) != (
+                root,
+                CONCEPT_VERSION,
+                steps,
+            ):
+                continue
+            walk: NDArray[np.float64] = np.load(directory / "v.npy")
+        except OSError, ValueError:
+            continue
+        return walk
+    return None
 
 
 def save_concept(concept: Concept, directory: Path) -> None:

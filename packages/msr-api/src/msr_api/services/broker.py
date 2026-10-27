@@ -1,5 +1,9 @@
 """What the broker can tell the health report: which workers answer, and each queue's depth and
-consumers. kombu is synchronous, so callers run these in a thread."""
+consumers. kombu is synchronous, so callers run these in a thread.
+
+The monitor never touches the publisher's connection pool: it has its own Celery app, and each
+check opens its own connection (with a timeout) and closes it. A slow or stuck health check can't
+hold a connection that a job's publish is waiting for."""
 
 from dataclasses import dataclass
 from typing import Protocol, cast
@@ -32,7 +36,8 @@ class CeleryMonitor:
     def workers(self, timeout: float) -> list[str]:
         # A broadcast: every worker on the vhost answers, busy or idle, and the call waits the
         # whole timeout to collect them.
-        replies = self.app.control.ping(timeout=timeout) or []
+        with self.app.connection_for_write() as conn:
+            replies = self.app.control.ping(timeout=timeout, connection=conn) or []
         return sorted(node for reply in replies for node in reply)
 
     def queues(self, names: tuple[str, ...]) -> list[QueueStats]:

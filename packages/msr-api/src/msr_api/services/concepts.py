@@ -26,9 +26,8 @@ from msr_api.schemas.concepts import (
     ConceptStatus,
     ConceptSummary,
     ConceptTerm,
-    RootTerm,
 )
-from msr_api.schemas.jobs import Job
+from msr_api.schemas.jobs import Job, RootTerm
 from msr_api.services import jobs as job_service
 from msr_api.services.models import get_model
 from msr_api.services.publisher import TaskPublisher
@@ -115,15 +114,17 @@ async def request_concept(
                 queue=settings.concept_queue,
                 correlation_id=correlation_id,
             )
-            return pending(await jobs.get(job.job_id) or job)
+            return await pending(conn, await jobs.get(job.job_id) or job)
         active = await jobs.active_concept(model_id, root.term_idx, params_hash)
         if active is not None:
-            return pending(active)
+            return await pending(conn, active)
     raise ServiceUnavailableError("the concept is changing state; try again", code="concept_busy")
 
 
-def pending(job: JobRow) -> ConceptStatus:
-    return ConceptStatus(status="pending", job_id=job.job_id, job=job_service.job_out(job))
+async def pending(conn: AsyncConnection[Any], job: JobRow) -> ConceptStatus:
+    return ConceptStatus(
+        status="pending", job_id=job.job_id, job=await job_service.job_out(conn, job)
+    )
 
 
 async def builder_job(conn: AsyncConnection[Any], job_id: UUID | None) -> Job | None:
@@ -131,7 +132,7 @@ async def builder_job(conn: AsyncConnection[Any], job_id: UUID | None) -> Job | 
     if job_id is None:
         return None
     row = await AsyncJobRepository(conn).get(job_id)
-    return job_service.job_out(row) if row else None
+    return await job_service.job_out(conn, row) if row else None
 
 
 async def concepts_for_root(

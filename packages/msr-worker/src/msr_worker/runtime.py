@@ -30,6 +30,8 @@ class Runtime:
             database.conninfo("worker"),
             min_size=1,
             max_size=settings.db_pool_max,
+            # Check a connection before lending it, so a Postgres restart doesn't fail a job.
+            check=ConnectionPool.check_connection,
             open=False,
         )
         redis = Redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=10)

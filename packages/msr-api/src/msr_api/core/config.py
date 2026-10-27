@@ -22,6 +22,13 @@ class ApiSettings(ServiceSettings):
         description="How long the health report waits for workers to answer its ping",
     )
 
+    health_cache_seconds: float = Field(
+        2.0,
+        ge=0,
+        validation_alias="MSR_HEALTH_CACHE_SECONDS",
+        description="How long one health report is reused (0: every request computes one)",
+    )
+
     sse_ping_seconds: int = Field(15, ge=1, validation_alias="MSR_SSE_PING_SECONDS")
     sse_block_ms: int = Field(
         15_000,

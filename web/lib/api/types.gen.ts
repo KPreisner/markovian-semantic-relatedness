@@ -124,12 +124,12 @@ export type Concept = {
  *
  * A root term plus any concept parameters to override. Omitted parameters take their
  * defaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.
+ *
+ * The reference terms (and so Q) are the model's, fixed when it was built, so there's no `q`.
+ * `trim_ratio`, `threshold`, `root_weight`, and `stored_terms` only reshape the scoring of the
+ * root's walk: changing them reuses an earlier concept's walk of the same root.
  */
 export type ConceptRequest = {
-    /**
-     * Q
-     */
-    q?: number | null;
     /**
      * Refs
      *
@@ -144,22 +144,32 @@ export type ConceptRequest = {
     root: string;
     /**
      * Root Weight
+     *
+     * The root's weight after scaling
      */
     root_weight?: number | null;
     /**
      * Steps
+     *
+     * λ; must be the λ of the model's X′ (the default)
      */
     steps?: number | null;
     /**
      * Stored Terms
+     *
+     * How many ranked terms are kept
      */
     stored_terms?: number | null;
     /**
      * Threshold
+     *
+     * Minimum z for a term to join the concept
      */
     threshold?: number | null;
     /**
      * Trim Ratio
+     *
+     * R: share of the reference distances dropped per term before μ and σ
      */
     trim_ratio?: number | null;
 };
@@ -422,6 +432,10 @@ export type Job = {
      * The concept or search, once succeeded
      */
     result_id: string | null;
+    /**
+     * A concept job's root term (null for searches)
+     */
+    root: RootTerm | null;
     /**
      * Started At
      *

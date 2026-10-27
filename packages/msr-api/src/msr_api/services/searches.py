@@ -69,7 +69,7 @@ async def create_search(
     )
     queued = await AsyncJobRepository(conn).get(job.job_id) or job
     return SearchStarted(
-        search_id=search.search_id, job_id=job.job_id, job=job_service.job_out(queued)
+        search_id=search.search_id, job_id=job.job_id, job=await job_service.job_out(conn, queued)
     )
 
 
@@ -87,7 +87,7 @@ async def get_search(conn: AsyncConnection[Any], search_id: UUID, *, limit: int)
         concept_ids=row.concept_ids,
         params=row.params,
         created_at=row.created_at,
-        job=job_service.job_out(job) if job else None,
+        job=await job_service.job_out(conn, job) if job else None,
         hits=[
             SearchHit(
                 rank=h.hit_rank,

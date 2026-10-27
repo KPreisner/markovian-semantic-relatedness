@@ -43,8 +43,9 @@ def celery_app(settings: ApiSettings, queues: tuple[str, ...] = QUEUES) -> Celer
 
 
 class CeleryPublisher:
-    def __init__(self, app: Celery) -> None:
+    def __init__(self, app: Celery, *, timeout: float = 10.0) -> None:
         self.app = app
+        self.timeout = timeout
 
     async def publish(
         self, task: str, job_id: UUID, *, queue: str, correlation_id: UUID | None
@@ -63,6 +64,8 @@ class CeleryPublisher:
                 retry_policy={"max_retries": 2, "interval_start": 0, "interval_step": 0.5},
             )
 
-        # kombu is synchronous; a publish (with its confirm) runs in a worker thread.
-        await anyio.to_thread.run_sync(send)
+        # kombu is synchronous; a publish (with its confirm) runs in a worker thread. It's bounded:
+        # a broker that never confirms fails the request (and the job) instead of hanging it.
+        with anyio.fail_after(self.timeout):
+            await anyio.to_thread.run_sync(send, abandon_on_cancel=True)
         return task_id

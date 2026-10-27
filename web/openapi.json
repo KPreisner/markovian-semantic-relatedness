@@ -198,7 +198,7 @@
       },
       "ConceptRequest": {
         "additionalProperties": false,
-        "description": "A root term plus any concept parameters to override. Omitted parameters take their\ndefaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.",
+        "description": "A root term plus any concept parameters to override. Omitted parameters take their\ndefaults; `steps` defaults to the λ the model's X′ was walked with for `refs`.\n\nThe reference terms (and so Q) are the model's, fixed when it was built, so there's no `q`.\n`trim_ratio`, `threshold`, `root_weight`, and `stored_terms` only reshape the scoring of the\nroot's walk: changing them reuses an earlier concept's walk of the same root.",
         "examples": [
           {
             "root": "trumpet"
@@ -209,17 +209,6 @@
           }
         ],
         "properties": {
-          "q": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Q"
-          },
           "refs": {
             "anyOf": [
               {
@@ -247,6 +236,7 @@
                 "type": "null"
               }
             ],
+            "description": "The root's weight after scaling",
             "title": "Root Weight"
           },
           "steps": {
@@ -258,6 +248,7 @@
                 "type": "null"
               }
             ],
+            "description": "λ; must be the λ of the model's X′ (the default)",
             "title": "Steps"
           },
           "stored_terms": {
@@ -269,6 +260,7 @@
                 "type": "null"
               }
             ],
+            "description": "How many ranked terms are kept",
             "title": "Stored Terms"
           },
           "threshold": {
@@ -280,6 +272,7 @@
                 "type": "null"
               }
             ],
+            "description": "Minimum z for a term to join the concept",
             "title": "Threshold"
           },
           "trim_ratio": {
@@ -291,6 +284,7 @@
                 "type": "null"
               }
             ],
+            "description": "R: share of the reference distances dropped per term before μ and σ",
             "title": "Trim Ratio"
           }
         },
@@ -714,6 +708,17 @@
             "description": "The concept or search, once succeeded",
             "title": "Result Id"
           },
+          "root": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RootTerm"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A concept job's root term (null for searches)"
+          },
           "started_at": {
             "anyOf": [
               {
@@ -751,6 +756,7 @@
           "job_type",
           "status",
           "model_id",
+          "root",
           "params",
           "progress",
           "result_id",
@@ -1691,7 +1697,7 @@
     },
     "/health": {
       "get": {
-        "description": "The stack's health: the API itself, Postgres, Redis, RabbitMQ (with each queue's depth and\nconsumers), the workers that answer a ping, and the active jobs. 503 when Postgres, Redis, or\nRabbitMQ is down; `degraded` (still 200) when no worker answers. Takes about a second: the\nworker ping waits for replies.",
+        "description": "The stack's health: the API itself, Postgres, Redis, RabbitMQ (with each queue's depth and\nconsumers), the workers that answer a ping, and the active jobs. 503 when Postgres, Redis, or\nRabbitMQ is down; `degraded` (still 200) when no worker answers. Takes about a second: the\nworker ping waits for replies. A report is reused for up to `MSR_HEALTH_CACHE_SECONDS`.",
         "operationId": "health",
         "responses": {
           "200": {

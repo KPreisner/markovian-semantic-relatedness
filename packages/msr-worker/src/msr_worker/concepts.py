@@ -4,7 +4,9 @@
    reused, not rebuilt.
 2. Reuse the concept's files if an earlier attempt (or the `msr concept` CLI) already wrote them.
    The directory is named for the root and cache key, as the CLI names it, so both share files.
-3. Otherwise walk, score, and rank, reporting the walk's progress, and save the files.
+3. Otherwise score and rank, and save the files. The walk is reused from any saved concept of the
+   same root and λ (only the scoring parameters differed); failing that, it's walked, reporting
+   its progress.
 4. Store the concept (`ON CONFLICT DO NOTHING` on the key) and mark the job succeeded in one
    transaction.
 """
@@ -17,7 +19,13 @@ import structlog
 from pydantic import ValidationError
 
 from msr.concept.build import Concept, ConceptParams, build_concept
-from msr.concept.storage import concept_dir_name, concept_key, load_concept, save_concept
+from msr.concept.storage import (
+    concept_dir_name,
+    concept_key,
+    load_concept,
+    save_concept,
+    saved_walk,
+)
 from msr.jobs.events import ProgressEvent
 from msr_db.concepts import ConceptRepository
 from msr_db.rows import JobRow
@@ -54,15 +62,24 @@ def run_concept(runtime: Runtime, job: JobRow, reporter: Reporter) -> UUID | Non
                 f"not {params.steps}",
             )
         term = model.vocab[root]
+        # A concept of this root with the same λ already walked it: only the scoring differs.
+        walk = saved_walk(runtime.settings.concepts_dir / job.model_id, root, params.steps)
+        if walk is not None:
+            reporter.progress(
+                ProgressEvent(
+                    phase="score", step=1, total=1, message=f"reusing the walk from {term!r}"
+                )
+            )
+            log.info("concept_walk_reused", root=root)
 
         def progress(step: int, total: int) -> None:
             reporter.progress(
                 ProgressEvent(phase="walk", step=step, total=total, message=f"walking {term!r}")
             )
 
-        concept = build_concept(model, root, references, params, progress=progress)
+        concept = build_concept(model, root, references, params, progress=progress, walk=walk)
         save(concept, directory)
-        log.info("concept_built", directory=str(directory))
+        log.info("concept_built", directory=str(directory), walked=walk is None)
 
     with runtime.pool.connection() as conn:
         concept_id = ConceptRepository(conn).insert(
