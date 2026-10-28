@@ -14,6 +14,7 @@ native runs skip that step, and `msr register` in the builder catches up.
 
 import argparse
 import os
+import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -37,6 +38,12 @@ def _log(message: str) -> None:
 def _workers(value: str) -> int:
     n = int(value)
     return n if n > 0 else max(1, (os.cpu_count() or 2) - 1)
+
+
+def _month(value: str) -> str:
+    if not re.fullmatch(r"\d{4}/(0[1-9]|1[0-2])", value):
+        raise argparse.ArgumentTypeError(f"expected YYYY/MM, got {value!r}")
+    return value
 
 
 def _register(what: str, register: Callable[[Any], None]) -> None:
@@ -110,6 +117,11 @@ def _parser() -> argparse.ArgumentParser:
     corpus_sub = corpus.add_subparsers(dest="source", required=True)
     ccnews = corpus_sub.add_parser("ccnews", help="CC-NEWS WARCs → JSONL")
     ccnews.add_argument("--input", type=Path, help="WARC directory (default data/raw/ccnews)")
+    ccnews.add_argument(
+        "--month",
+        type=_month,
+        help="download this CC-NEWS month (YYYY/MM) into --input, one WARC at a time",
+    )
     ccnews.add_argument("--lang", default="en", help="ISO 639-1 code of the articles to keep")
     ccnews.add_argument("--name", help="corpus name (default ccnews-<lang>)")
     ccnews.add_argument("--workers", type=_workers, default=1, help="processes (0: all)")
@@ -186,6 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 data.corpora,
                 name=args.name or f"ccnews-{args.lang}",
                 lang=args.lang,
+                month=args.month,
                 workers=args.workers,
                 force=args.force,
                 log=_log,
