@@ -19,7 +19,7 @@ htmlcov/
 tmp/
 
 # Downloaded data and built model artifacts
-data/
+data
 
 # Secrets / local config, and personal tasks
 .env
