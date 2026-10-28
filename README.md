@@ -168,12 +168,27 @@ show up as `udt:<name>`.
 Everything large lives under `data/` (gitignored; set `MSR_DATA_DIR` to put it elsewhere). The
 commands below run from the repository root, and each block can be pasted into a shell as is.
 
-The parse, corpus, and model steps use the native tasks (`build:*-native`). Dropping `-native`
-(`task build:parse`, `task build:corpus`, `task build:model`) runs the same command, with the same
-arguments, in the builder container instead, with `data/` mounted at `/data`; it produces the same
-artifacts. In the container, `msr model` and `msr corpus` also register the result in Postgres, so
-the running stack can serve it. A native build skips that step; register it afterwards with
-`task build:register -- model <id>` or `task build:register -- corpus <name>`.
+The parse, corpus, and model steps run in the builder container (`task build:parse`,
+`task build:corpus`, `task build:model`), with `data/` mounted at `/data`. There, `msr model` and
+`msr corpus` finish by registering the result in Postgres, so the running stack serves it at once.
+Each task has a `-native` twin (`task build:model-native`, after `task py:sync`) that runs the same
+command with the same arguments and produces the same artifacts. The native twin doesn't register
+the result; afterwards, run `task build:register -- model <id>` or
+`task build:register -- corpus <name>`.
+
+### 0. Start the stack
+
+`task up` builds the images, creates and migrates the database, and starts everything. The UI is
+at <http://127.0.0.1:3000>, with no models or corpora until the steps below register them. The
+workers mount `data/models/`, `data/corpora/`, `data/concepts/`, and `data/searches/`. Create them
+first: Docker creates a missing mount folder owned by root, and then neither the workers nor the
+builder can write to it.
+
+```bash
+mkdir -p data/models data/corpora data/concepts data/searches
+task up
+task status
+```
 
 ### 1. Download the raw data
 
@@ -194,18 +209,7 @@ curl -L -o data/raw/hf_wiki/20231101.simple/train-00000-of-00001.parquet \
   https://huggingface.co/datasets/wikimedia/wikipedia/resolve/main/20231101.simple/train-00000-of-00001.parquet
 ```
 
-One or two CC-NEWS WARCs (about 1 GB each) as a search corpus. List a month's files:
-
-```bash
-mkdir -p data/raw/ccnews
-curl -s https://data.commoncrawl.org/crawl-data/CC-NEWS/2026/09/warc.paths.gz | gunzip | head
-```
-
-Then download one, replacing `<path>` with a line from that list:
-
-```bash
-curl -L -O --output-dir data/raw/ccnews https://data.commoncrawl.org/<path>
-```
+The CC-NEWS search corpus needs no download here: step 3 fetches it.
 
 ### 2. Parse Wikipedia into term sets
 
@@ -214,18 +218,37 @@ roughly an hour. The output goes to `data/parsed/hf_wiki-20231101.simple/en_core
 in parts, so an interrupted run resumes where it stopped.
 
 ```bash
-task build:parse-native -- wiki data/raw/hf_wiki/20231101.simple \
+task build:parse -- wiki data/raw/hf_wiki/20231101.simple \
   --pipeline data/nlp/en_core_web_lg --workers 8
 ```
 
 ### 3. Prepare the CC-NEWS search corpus
 
-Extracts article text from every WARC in `data/raw/ccnews/` and keeps the English articles, in
-`data/corpora/ccnews-en/`. One WARC takes about 8 minutes and yields a few thousand articles. This
-can run at the same time as the parse.
+Downloads a month of CC-NEWS from Common Crawl, extracts the article text, and keeps the English
+articles, in `data/corpora/ccnews-en/`. A month is a few hundred WARCs of about 1 GB each (374 in
+September 2026), news in every language. Each worker downloads one WARC into `data/raw/ccnews/`,
+converts it, and deletes it, so the run needs about 1 GB of free disk per worker, and only the
+English text, a few thousand articles per WARC, is kept. One WARC takes about 8 minutes of CPU, so
+a month with 7 workers takes about 7 hours. Rerunning the command resumes: it skips every WARC
+already converted, without downloading it again. This can run at the same time as the parse, but
+the two then share the CPUs.
 
 ```bash
-task build:corpus-native -- ccnews --lang en
+task build:corpus -- ccnews --month 2026/09 --lang en --workers 7
+```
+
+Without `--month`, the command converts the WARCs already in `data/raw/ccnews/` instead, e.g.
+one you downloaded yourself from the month's
+[file list](https://data.commoncrawl.org/crawl-data/CC-NEWS/2026/09/warc.paths.gz).
+
+The UI shows the corpus by its id, `ccnews-en`, with the `description` from
+`data/corpora/ccnews-en/corpus.json` under it. Each `msr corpus` run rewrites that file. To use
+your own description, edit the file after the run, then register the corpus again:
+
+```bash
+jq '.description = "CC News (en)"' data/corpora/ccnews-en/corpus.json > corpus.json.tmp
+mv corpus.json.tmp data/corpora/ccnews-en/corpus.json
+task build:register -- corpus ccnews-en
 ```
 
 ### 4. Build the model
@@ -233,28 +256,29 @@ task build:corpus-native -- ccnews --lang en
 Drops the 100 most frequent terms as stop words, builds C, M, S, and T, and walks the 51 reference
 nodes for X′, into `data/models/<id>/` (its `df_report.json` shows where other stop-word rules
 would cut). Rerunning the same command with the same `--id` resumes at the first unfinished stage.
-`--description` is free text shown with the model; rerunning with a new one replaces it.
+X′, at the paper's 1,000 steps, takes hours on CPU. The walk, like a concept job's, runs on half the
+CPUs, leaving room for the rest of the stack; `MSR_WALK_THREADS` in `.env` sets another number.
 
-For local development, a small, fast model is enough. `--parts 10` uses the first 10 parsed parts
-(about 20,000 articles) and `--steps 100` walks 100 steps instead of 1,000; it builds in about 4
-minutes. Concepts use the same step count automatically.
-
-```bash
-task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name simplewiki-small --id simplewiki-small --parts 10 --steps 100 \
-  --description "Simple English Wikipedia 20231101, first 10 of 121 parts, 100 steps"
-```
-
-All of Simple English with the paper's 1,000 steps (X′ takes hours on CPU):
+- `--id` names the model's directory, and it's the model's id in the API, the UI's URLs, and the
+  CLI's `--model`.
+- `--name` is the model's name in Postgres (`models.model_name`).
+- `--description` is shown in the UI's model picker. Rerunning with a new one replaces it.
 
 ```bash
-task build:model-native -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name simplewiki --id simplewiki-1 --description "Simple English Wikipedia 20231101"
+task build:model -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
+  --name "Simple Wikipedia" --id simplewiki --description "Simple Wikipedia"
 ```
+
+`docker stats` shows the build's CPU and memory while it runs. `time task …` gives a step's wall
+time. `/usr/bin/time -v task …` won't help with memory: its peak memory is the `docker compose`
+client's, not the build's.
 
 ### 5. Concepts and search
 
-A new concept is one walk over the model: seconds for the small model, minutes for the full one.
+Once the model and corpus are registered, build concepts at `/concepts/new` and search at `/search`
+in the UI. The `msr` CLI does the same from the shell, natively (after `task py:sync`).
+
+A new concept is one walk over the model, which takes minutes.
 Concepts are cached under `data/concepts/`, so a repeat is instant. Each concept's
 directory has a `concept.tsv` with all of its ranked terms (rank, weight, co-occur, count, term),
 for reading in a spreadsheet or with `less`. Several roots in one search are
@@ -264,9 +288,9 @@ they match anywhere; `--match substring` matches inside words everywhere. A para
 in several articles is listed once.
 
 ```bash
-task msr -- concept trumpet --model simplewiki-small
-task msr -- search trumpet --corpus ccnews-en --model simplewiki-small --workers 8
-task msr -- search music festival --corpus ccnews-en --model simplewiki-small
+task msr -- concept trumpet --model simplewiki
+task msr -- search trumpet --corpus ccnews-en --model simplewiki --workers 8
+task msr -- search music festival --corpus ccnews-en --model simplewiki
 ```
 
 ## License
