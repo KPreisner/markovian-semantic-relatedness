@@ -173,6 +173,10 @@ export function Workbench({ models }: { models: ModelSummary[] }) {
           <span className="font-mono">Trumpet</span> and <span className="font-mono">trumpet</span>{" "}
           are different terms.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Please keep it professional: this demo is part of my job applications, and every concept
+          built here is listed for other visitors, so no profanity or offensive terms.
+        </p>
         {error && (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {error}

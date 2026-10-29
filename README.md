@@ -15,6 +15,11 @@ query, without machine translation.
 I designed MSR and led the project as a U.S. Government researcher (2019–2022). This repository
 is a from-scratch reimplementation for my portfolio.
 
+🌐 **Live demo:** <https://msr.preisner.us>, running on an AWS EC2 instance with the
+Simple English Wikipedia model and a CC-NEWS search corpus. It's part of my job applications, and
+every concept built there is listed for other visitors, so please keep the terms you try
+professional: no profanity or offensive language.
+
 📄 **Paper:** [Markovian Semantic Relatedness: a Novel Approach to Content Discovery](docs/paper/MarkovianSemanticRelatedness_april_25_2022.pdf)
 (Preisner, Digirolamo, Flowers, Breech, Kosloski, 2022). It's a U.S. Government work; see
 [NOTICE](docs/paper/NOTICE.md).
