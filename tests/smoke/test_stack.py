@@ -82,6 +82,8 @@ def stack(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stack]:
     env = {
         **os.environ,
         "COMPOSE_PROJECT_NAME": PROJECT,
+        # Not .env's, which on a production box adds Caddy (compose.prod.yaml) and its ports.
+        "COMPOSE_FILE": "compose.yaml",
         "MSR_DATA_DIR": str(data),
         "MSR_WEB_PORT": str(port),
     }
