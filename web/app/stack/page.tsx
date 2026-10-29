@@ -7,23 +7,28 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "The tech stack" };
 
-// The containers, top to bottom in the order a request reaches them (compose.yaml).
+// The containers, top to bottom in the order a request reaches them (compose.yaml, plus caddy from
+// compose.prod.yaml).
 type Tier = { label: string; boxes: { name: string; tech: string; note: string }[] };
 
 const TIERS: Tier[] = [
   {
     label: "Browser",
-    boxes: [{ name: "You", tech: "React 19", note: "calls only the web container" }],
+    boxes: [{ name: "You", tech: "React 19", note: "over HTTPS, to Caddy only" }],
   },
   {
     label: "Edge",
     boxes: [
       {
-        name: "web",
-        tech: "Next.js 16 · Node 24",
-        note: "the UI and its BFF; the only published port",
+        name: "caddy",
+        tech: "Caddy 2.11 · Let's Encrypt",
+        note: "HTTPS on 80 and 443; the only port open to the internet",
       },
     ],
+  },
+  {
+    label: "UI",
+    boxes: [{ name: "web", tech: "Next.js 16 · Node 24", note: "the UI and its BFF" }],
   },
   {
     label: "API",
@@ -64,6 +69,11 @@ const TIERS: Tier[] = [
 ];
 
 const SERVICES = [
+  {
+    name: "caddy",
+    tech: "Caddy 2.11, Let's Encrypt",
+    body: "Terminates HTTPS in front of web, the only container reachable from the internet. It gets and renews its certificate on its own, redirects HTTP to HTTPS, and passes the Server-Sent Events streams through unbuffered. It runs only in production (compose.prod.yaml).",
+  },
   {
     name: "web",
     tech: "Next.js 16, React 19, Tailwind 4, Zod",
@@ -143,7 +153,7 @@ const CHOICES = [
   },
   {
     title: "A sealed backend",
-    body: "Postgres, RabbitMQ, Redis, the API, and the workers sit on an internal Docker network with no route out. Only web is published, on localhost; only the builder can reach the internet, for its downloads.",
+    body: "Postgres, RabbitMQ, Redis, the API, and the workers sit on an internal Docker network with no route out. Only Caddy is published to the internet, and web on localhost; only the builder can reach the internet, for its downloads.",
   },
   {
     title: "Types end to end",
@@ -152,6 +162,34 @@ const CHOICES = [
   {
     title: "One workspace, small images",
     body: "A uv workspace with one package per deployable part (core, nlp, db, api, worker, build) and one lockfile, so each container installs only what it runs.",
+  },
+];
+
+// How the live site runs (compose.prod.yaml on one EC2 box).
+const PRODUCTION = [
+  {
+    title: "One box",
+    body: "The whole Compose stack runs on a single EC2 instance (8 vCPUs, 32 GB). Models, corpora, concepts, and searches live on a separate 100 GB EBS volume; images and the database's volumes stay on the root disk.",
+  },
+  {
+    title: "One overlay",
+    body: "Production is compose.yaml plus compose.prod.yaml, picked up from COMPOSE_FILE in .env, so the same task commands run it as run a laptop. The overlay only adds Caddy, restart policies, and log caps.",
+  },
+  {
+    title: "HTTPS by default",
+    body: "Caddy holds a Let's Encrypt certificate in a Docker volume and renews it itself. Plain HTTP redirects to HTTPS, browsers are told to stay on HTTPS (HSTS), and HTTP/3 is on.",
+  },
+  {
+    title: "Back after a reboot",
+    body: "Every long-running service restarts unless it was stopped on purpose, and Docker starts with the machine. A worker being stopped gets 30 minutes to finish its job first.",
+  },
+  {
+    title: "Bounded logs",
+    body: "Each container keeps at most five compressed 20 MB log files, so a chatty service can't fill the disk.",
+  },
+  {
+    title: "Built in place",
+    body: "Datasets are downloaded and models built on the box itself, in the builder container, while the site stays up. Each model and corpus registers in Postgres as it finishes and appears in the UI.",
   },
 ];
 
@@ -165,7 +203,7 @@ export default function StackPage() {
             How it&rsquo;s <em className="text-gradient pr-1">built</em>
           </>
         }
-        lead="A Python core for the walk and the search, served by FastAPI, run as jobs by Celery workers over RabbitMQ, with Postgres for state, Redis for progress, and a Next.js UI, all in Docker Compose."
+        lead="A Python core for the walk and the search, served by FastAPI, run as jobs by Celery workers over RabbitMQ, with Postgres for state, Redis for progress, and a Next.js UI, all in Docker Compose behind Caddy."
       >
         <div className="mt-2 flex flex-wrap gap-3">
           <Button
@@ -253,6 +291,20 @@ export default function StackPage() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section aria-labelledby="production-heading" className="flex flex-col gap-6">
+          <h2 id="production-heading" className="text-3xl md:text-4xl">
+            In production
+          </h2>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {PRODUCTION.map((c) => (
+              <li key={c.title} className="rounded-2xl border bg-card p-5">
+                <h3 className="font-sans text-base font-semibold tracking-normal">{c.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{c.body}</p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section aria-labelledby="choices-heading" className="flex flex-col gap-6">

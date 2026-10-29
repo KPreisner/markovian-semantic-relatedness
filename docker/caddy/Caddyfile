@@ -1,0 +1,7 @@
+# Caddy in front of web (compose.prod.yaml). It gets and renews the certificate from Let's Encrypt
+# on its own, and redirects HTTP to HTTPS. SSE responses (the job progress relay) are streamed
+# without buffering, since reverse_proxy flushes text/event-stream immediately.
+msr.preisner.us {
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:3000
+}

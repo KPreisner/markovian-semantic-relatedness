@@ -1,0 +1,55 @@
+# Production, on top of compose.yaml: Caddy terminates HTTPS for msr.preisner.us in front of web,
+# the long-running services come back after a crash or a reboot, and their logs are capped. To use
+# it for every `task` command, set COMPOSE_FILE=compose.yaml:compose.prod.yaml in .env, then run
+# `task up`.
+#
+# web stays on 127.0.0.1:${MSR_WEB_PORT:-3000} too, so an SSH tunnel still reaches it directly.
+
+# Docker's `local` log driver (compressed) keeps at most 5 files of 20 MB per container, so logs
+# can't fill the root disk. The same as the box's /etc/docker/daemon.json, recorded here too.
+x-prod: &prod
+  restart: unless-stopped
+  logging:
+    driver: local
+    options:
+      max-size: 20m
+      max-file: "5"
+
+services:
+  # The only service published beyond the host: 80 (redirects to HTTPS, and the ACME HTTP
+  # challenge) and 443 over TCP and UDP (HTTP/3). Its certificates live in the caddy-data volume,
+  # so a recreate doesn't request new ones.
+  caddy:
+    image: caddy:2.11.7-alpine
+    <<: *prod
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [frontend]
+    healthcheck:
+      # The admin API, on localhost inside the container only.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web: *prod
+  api: *prod
+  postgres: *prod
+  rabbitmq: *prod
+  redis: *prod
+  worker-cpu: *prod
+  worker-search: *prod
+
+volumes:
+  caddy-data:
+  caddy-config:
