@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { ConceptExample } from "@/components/search/concept-example";
 import { type Chip, SearchBuilder } from "@/components/search/search-builder";
 import { PageHeader } from "@/components/site/page-header";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,10 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
         lead="Each concept's top-ranked terms are matched as whole words in every chunk of the raw corpus, so nothing is tokenized or indexed ahead of time."
       >
         <div className="mt-2">
-          <Button asChild variant="outline">
+          <Button
+            asChild
+            className="bg-gradient text-primary-foreground shadow-[0_0_32px_var(--glow)]"
+          >
             <Link href="/searches">All searches →</Link>
           </Button>
         </div>
@@ -33,6 +37,7 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
         <Suspense fallback={<Skeleton className="h-96 rounded-3xl" />}>
           <SearchLoader searchParams={searchParams} />
         </Suspense>
+        <ConceptExample />
       </div>
     </>
   );

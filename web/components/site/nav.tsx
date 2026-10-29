@@ -5,6 +5,7 @@ import { Logo } from "@/components/site/logo";
 const LINKS = [
   { href: "/concepts/new", label: "Concepts" },
   { href: "/search", label: "Search" },
+  { href: "/stack", label: "Stack" },
   { href: "/health", label: "Health" },
 ];
 
