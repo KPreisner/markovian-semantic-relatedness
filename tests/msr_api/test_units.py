@@ -18,14 +18,17 @@ from msr_db.rows import JobRow, ModelRow
 NOW = datetime(2026, 10, 26, tzinfo=UTC)
 
 
-def model(reference_steps: dict[str, int]) -> ModelRow:
+def model(reference_steps: dict[str, int], reference_q: dict[str, int] | None = None) -> ModelRow:
+    manifest: dict[str, Any] = {"reference_steps": reference_steps}
+    if reference_q is not None:
+        manifest["reference_q"] = reference_q
     return ModelRow(
         model_id="m",
         model_name="m",
         description="",
         term_count=1,
         vocab_sha256="x",
-        manifest={"reference_steps": reference_steps},
+        manifest=manifest,
         created_at=NOW,
         updated_at=NOW,
     )
@@ -65,6 +68,12 @@ def test_steps_default_to_the_models_walk_length() -> None:
         model({"degree-mean": 100, "random:7": 20}), ConceptRequest(root="cat", refs="random:7")
     )
     assert (str(seeded.refs), seeded.steps) == ("random:7", 20)
+
+
+def test_q_is_the_models() -> None:
+    request = ConceptRequest(root="cat")
+    assert resolve_params(model({"degree-mean": 100}), request).q == 50  # built before Q was kept
+    assert resolve_params(model({"degree-mean": 100}, {"degree-mean": 150}), request).q == 150
 
 
 def test_unbuilt_strategies_and_bad_values_are_unprocessable() -> None:

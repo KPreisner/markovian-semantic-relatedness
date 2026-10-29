@@ -16,9 +16,11 @@ from msr.concept.storage import (
 )
 from msr.model.artifacts import (
     ModelManifest,
+    built_reference_q,
     built_reference_steps,
     load_model,
     load_references,
+    reference_q,
     references_dir,
     save_model,
     save_references,
@@ -74,6 +76,14 @@ def test_references_round_trip(model: Model, tmp_path: Path) -> None:
         np.testing.assert_array_equal(loaded.xprime, refs.xprime)
     assert references_dir(tmp_path, Random(7)).name == "random-7"
     assert built_reference_steps(tmp_path) == {str(DegreeMean()): 20, str(Random(7)): 20}
+
+
+def test_references_keep_their_q(model: Model, tmp_path: Path) -> None:
+    save_references(compute_references(model, DegreeMean(), q=3, steps=20), tmp_path)
+    loaded = load_references(tmp_path, DegreeMean())
+    assert loaded.q == 3 and len(loaded.nodes) == 4
+    assert reference_q(tmp_path, DegreeMean()) == 3
+    assert built_reference_q(tmp_path) == {str(DegreeMean()): 3}
 
 
 def test_concept_round_trip(model: Model, tmp_path: Path) -> None:

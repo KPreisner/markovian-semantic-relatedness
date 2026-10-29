@@ -68,7 +68,7 @@ def test_degree_mean_orders_by_distance_to_mean_degree(model: Model) -> None:
 
 def test_df_mean_orders_by_distance_to_mean_df(model: Model) -> None:
     # df: the 8; cat, dog 3; hat, lost 2; the rest 1. Mean 22/9 ≈ 2.44.
-    assert names(model, compute_references(model, DfMean(), count=4, steps=50).nodes) == [
+    assert names(model, compute_references(model, DfMean(), q=3, steps=50).nodes) == [
         "hat",
         "lost",
         "cat",
@@ -77,7 +77,7 @@ def test_df_mean_orders_by_distance_to_mean_df(model: Model) -> None:
 
 
 def test_exact_is_the_whole_component_in_id_order(model: Model) -> None:
-    assert names(model, compute_references(model, Exact(), count=2, steps=50).nodes) == LARGE
+    assert names(model, compute_references(model, Exact(), q=1, steps=50).nodes) == LARGE
 
 
 @pytest.mark.parametrize("strategy", [Random(1), StratifiedLogDf(1), GaussLogDf(1)], ids=str)
@@ -99,7 +99,7 @@ def test_stratified_takes_one_node_per_df_stratum(model: Model) -> None:
 
 
 def test_xprime_columns_are_the_references_walks(model: Model) -> None:
-    refs = compute_references(model, DegreeMean(), count=4, steps=50)
+    refs = compute_references(model, DegreeMean(), q=3, steps=50)
     np.testing.assert_array_equal(refs.xprime, hitting_times(model, refs.nodes.tolist(), steps=50))
 
 
@@ -113,7 +113,7 @@ def test_root_that_is_a_reference_drops_its_own_column(model: Model) -> None:
 
 
 def test_root_that_is_not_a_reference_drops_the_last(model: Model) -> None:
-    refs = compute_references(model, DegreeMean(), count=4, steps=50)  # dog, hat, in, lost
+    refs = compute_references(model, DegreeMean(), q=3, steps=50)  # dog, hat, in, lost
     used, _, dropped = reference_columns(model, model.vocab.id("cat"), refs, q=3)
     assert names(model, used) == ["dog", "hat", "in"]
     assert model.vocab[dropped] == "lost"

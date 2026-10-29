@@ -9,8 +9,9 @@ import orjson
 import pyarrow.parquet as pq
 import pytest
 
-from msr.model.artifacts import load_model, read_manifest, write_manifest
+from msr.model.artifacts import load_model, load_references, read_manifest, write_manifest
 from msr.model.build import ModelParams, build_model
+from msr.model.references import DegreeMean
 from msr_build.cli import main
 from msr_build.parse import read_parse_manifest
 from msr_nlp.terms import TERM_RULES
@@ -77,6 +78,21 @@ def test_concepts_default_to_the_models_steps(built: Path) -> None:
         f"{load_model(built / 'models' / MODEL_ID).vocab.id('dog')}-*"
     )
     assert orjson.loads((concept_dir / "params.json").read_bytes())["params"]["steps"] == 50
+
+
+def test_a_new_q_walks_the_references_again(built: Path) -> None:
+    model_id = "toy-q"
+    model_dir = built / "models" / model_id
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("MSR_DATA_DIR", str(built))
+        assert main(model_argv(built, model_id)) == 0
+        assert read_manifest(model_dir).reference_q == {"degree-mean": 50}
+        assert main([*model_argv(built, model_id), "--q", "3"]) == 0
+        manifest = read_manifest(model_dir)
+        assert manifest.reference_q == {"degree-mean": 3}
+        assert len(load_references(model_dir, DegreeMean()).nodes) == 4
+        # Concepts take the model's Q.
+        assert main(["concept", "cat", *CONCEPT_ARGS[:1], model_id, *CONCEPT_ARGS[2:]]) == 0
 
 
 def test_parts_builds_a_smaller_model(built: Path) -> None:
