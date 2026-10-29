@@ -14,7 +14,7 @@ length, and Q the number of reference nodes (the UI's "comparison terms").
 | [Root's distance to itself](#a-roots-distance-to-itself-is-0) | Eqs. 11–18 give it a return time | 0, the textbook hitting time |
 | [Eq. 23 scaling](#eq-23-scaling) | `y / (w_r · a)`, which maps the root to 1/a | `a · y / w_r`, so the root is 100 |
 | [Root's own weight](#the-roots-own-weight) | Not specified | Its own z, pinned to rank 1 and always kept |
-| [Reference set](#the-reference-set) | May include the root | Root's column dropped; 51 precomputed, so Q = 50 |
+| [Reference set](#the-reference-set) | May include the root | Root's column dropped; Q + 1 precomputed (Q = 50 by default) |
 | [Reference component](#the-reference-component) | Not specified | The largest component; roots elsewhere use their own |
 | [σ](#population-σ) | Not specified | Population (`ddof=0`) |
 | [Stop words](#stop-words) | Not mentioned | The top 100 terms by chunk frequency, dropped before C is built |
@@ -79,10 +79,11 @@ with an error rather than dividing by zero.
 X of Eq. 19). If the root happens to be a reference, the paper keeps its column and relies on the
 outlier trim to discard the root's distance to itself.
 
-Here the model build walks Q + 1 = 51 references once, and each concept drops one column: the
-root's own if it's a reference, otherwise the weakest pick (strategies return references best
-first). Every real concept uses exactly Q = 50 columns, with no extra walks, and the root's
-self-distance never enters its own statistics. Small components follow the same rule:
+Here the model build walks Q + 1 references once (Q = 50 unless `msr model --q` says otherwise),
+and each concept drops one column: the root's own if it's a reference, otherwise the weakest pick
+(strategies return references best first). Every real concept uses exactly Q columns, with no
+extra walks, and the root's self-distance never enters its own statistics. Q is recorded with X′
+(`refs.json`, and `reference_q` in the manifest), and concepts take it from the model. Small components follow the same rule:
 `refs = min(Q + 1, |component|)` and `Q_eff = refs − 1`.
 
 Reference selection is pluggable. `degree-mean` (degree closest to the component's mean, the
@@ -224,7 +225,7 @@ concepts.
 - Re-scoring reuses the walk. The walk depends only on the model, the root, and λ; the trim ratio,
   z threshold, root weight, and stored-term count only score it. Changing a scoring setting reuses
   the saved v and skips the minutes-long walk.
-- Q isn't a request parameter: a root in the largest component always uses the model's 50
+- Q isn't a request parameter: a root in the largest component always uses the model's Q
   precomputed columns, so a Q in the request would change the cache key without changing the
   concept.
 - Failures and timeouts aren't cached.

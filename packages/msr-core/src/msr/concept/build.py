@@ -11,6 +11,7 @@ from msr.concept.ranking import rank_terms, scale
 from msr.concept.zscore import negated_z, trim_count, trimmed_stats
 from msr.model.build import Model
 from msr.model.references import (
+    DEFAULT_Q,
     DegreeMean,
     References,
     StrategySpec,
@@ -29,7 +30,7 @@ class ConceptParams(BaseModel):
 
     refs: StrategySpec = Field(DegreeMean(), description="Reference strategy, e.g. degree-mean")
     steps: int = Field(1000, ge=1, description="λ: walk steps, no early stop")
-    q: int = Field(50, ge=1, description="Reference columns used per concept")
+    q: int = Field(DEFAULT_Q, ge=1, description="Q: reference columns used per concept")
     trim_ratio: float = Field(0.2, ge=0, lt=1, description="R: p = ⌈R·Q⌉ entries trimmed per row")
     threshold: float = Field(6.0, description="Minimum unscaled z kept in the concept")
     root_weight: float = Field(100.0, gt=0, description="a: the root's weight after scaling")
@@ -99,6 +100,8 @@ def build_concept(
         raise ValueError(f"references use {references.strategy}, not {params.refs}")
     if params.steps != references.steps:
         raise ValueError(f"X′ was walked with λ = {references.steps}, not {params.steps}")
+    if params.q != references.q:
+        raise ValueError(f"X′ has Q = {references.q}, not {params.q}")
     refs, xprime, dropped = reference_columns(model, root, references, params.q, backend=backend)
     if walk is None:
         v = hitting_times(model, [root], steps=params.steps, backend=backend, progress=progress)[

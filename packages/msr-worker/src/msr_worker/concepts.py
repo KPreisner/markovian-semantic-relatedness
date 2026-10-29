@@ -61,6 +61,10 @@ def run_concept(runtime: Runtime, job: JobRow, reporter: Reporter) -> UUID | Non
                 f"X′ for {str(params.refs)!r} was walked with λ = {references.steps}, "
                 f"not {params.steps}",
             )
+        if references.q != params.q:
+            raise JobFailedError(
+                "q_not_built", f"X′ for {str(params.refs)!r} has Q = {references.q}, not {params.q}"
+            )
         term = model.vocab[root]
         # A concept of this root with the same λ already walked it: only the scoring differs.
         walk = saved_walk(runtime.settings.concepts_dir / job.model_id, root, params.steps)

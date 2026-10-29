@@ -31,7 +31,7 @@ const STEPS = [
   },
   {
     title: "Measured against comparison terms",
-    body: "The model also walked from about 50 comparison terms spread across the graph, so it knows how soon each term is usually reached. A term reached much sooner from the chosen term than from those gets a high z-score, and the terms above the threshold form the concept.",
+    body: "The model also walked from a set of comparison terms spread across the graph (50 unless it was built with another number), so it knows how soon each term is usually reached. A term reached much sooner from the chosen term than from those gets a high z-score, and the terms above the threshold form the concept.",
   },
   {
     title: "A query expansion with intuitive weights",

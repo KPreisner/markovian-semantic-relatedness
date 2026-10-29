@@ -219,7 +219,7 @@ in parts, so an interrupted run resumes where it stopped.
 
 ```bash
 task build:parse -- wiki data/raw/hf_wiki/20231101.simple \
-  --pipeline data/nlp/en_core_web_lg --workers 8
+  --pipeline data/nlp/en_core_web_lg --workers 32
 ```
 
 ### 3. Prepare the CC-NEWS search corpus
@@ -234,7 +234,7 @@ already converted, without downloading it again. This can run at the same time a
 the two then share the CPUs.
 
 ```bash
-task build:corpus -- ccnews --month 2026/09 --lang en --workers 7
+task build:corpus -- ccnews --month 2026/09 --lang en --workers 32
 ```
 
 Without `--month`, the command converts the WARCs already in `data/raw/ccnews/` instead, e.g.
@@ -253,20 +253,26 @@ task build:register -- corpus ccnews-en
 
 ### 4. Build the model
 
-Drops the 100 most frequent terms as stop words, builds C, M, S, and T, and walks the 51 reference
+Drops the 100 most frequent terms as stop words, builds C, M, S, and T, and walks the reference
 nodes for X′, into `data/models/<id>/` (its `df_report.json` shows where other stop-word rules
 would cut). Rerunning the same command with the same `--id` resumes at the first unfinished stage.
-X′, at the paper's 1,000 steps, takes hours on CPU. The walk, like a concept job's, runs on half the
-CPUs, leaving room for the rest of the stack; `MSR_WALK_THREADS` in `.env` sets another number.
+X′, at the paper's 1,000 steps, takes hours on CPU, in proportion to the number of references. The
+walk, like a concept job's, runs on half the CPUs, leaving room for the rest of the stack;
+`MSR_WALK_THREADS` in `.env` sets another number.
 
 - `--id` names the model's directory, and it's the model's id in the API, the UI's URLs, and the
   CLI's `--model`.
 - `--name` is the model's name in Postgres (`models.model_name`).
 - `--description` is shown in the UI's model picker. Rerunning with a new one replaces it.
+- `--q` is Q, the reference terms each concept is measured against (default 50). The build walks
+  Q + 1 of them, so a concept can leave out its own root. Rerunning with another Q walks X′ again.
 
 ```bash
 task build:model -- data/parsed/hf_wiki-20231101.simple/en_core_web_lg-3.8.0 \
-  --name "Simple Wikipedia" --id simplewiki --description "Simple Wikipedia"
+  --name "Simple Wikipedia" --id simplewiki --q 150 \
+  --description "Simple English Wikipedia (https://simple.wikipedia.org), snapshot 2023-11-01: \
+articles written in basic English, with shorter sentences and a smaller vocabulary than the \
+full English Wikipedia, and far fewer, shorter articles."
 ```
 
 `docker stats` shows the build's CPU and memory while it runs. `time task …` gives a step's wall

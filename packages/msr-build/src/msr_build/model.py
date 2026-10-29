@@ -18,6 +18,7 @@ import pyarrow.parquet as pq
 
 from msr.model.artifacts import (
     ModelManifest,
+    built_reference_q,
     built_reference_steps,
     load_model,
     read_manifest,
@@ -26,7 +27,7 @@ from msr.model.artifacts import (
     write_manifest,
 )
 from msr.model.build import Model, ModelParams, assemble_model, select_vocab
-from msr.model.references import Strategy, compute_references
+from msr.model.references import DEFAULT_Q, Strategy, compute_references
 from msr.model.stopwords import Knee, MaxDF, StopWordRule, TopK, select_stop_words
 from msr_build.parse import DF_FILE, count_df, parts, read_parse_manifest, term_sets
 from msr_build.stages import run_stage
@@ -99,6 +100,7 @@ def build_model(
     params: ModelParams | None = None,
     strategies: Sequence[Strategy] = (),
     steps: int = 1000,
+    q: int = DEFAULT_Q,
     save_s: bool = True,
     per_language: bool = False,
     max_parts: int | None = None,
@@ -108,7 +110,8 @@ def build_model(
     """Build or resume a model. `per_language` runs the stop-word rule separately per language
     (any CJK character means zh), for bilingual models. `max_parts` builds from only the first N
     parsed parts, for a small, fast model; df is then counted over those parts. `description`
-    replaces the stored one; `None` keeps it (empty for a new model)."""
+    replaces the stored one; `None` keeps it (empty for a new model). `q` is Q, the reference
+    columns per concept: X′ walks Q + 1 references, and is walked again if built with another Q."""
     params = params or ModelParams()
     parse = read_parse_manifest(parsed)
     model_id = model_id or new_model_id(name)
@@ -169,6 +172,7 @@ def build_model(
             build,
             description=description,
             reference_steps=built_reference_steps(out),
+            reference_q=built_reference_q(out),
         )
         write_manifest(out, manifest)
 
@@ -181,11 +185,15 @@ def build_model(
             nonlocal model
             model = model or load_model(out)
             refs = compute_references(
-                model, strategy, steps=steps, progress=_progress(log, f"refs {strategy}")
+                model, strategy, q=q, steps=steps, progress=_progress(log, f"refs {strategy}")
             )
             return save_references(refs, out)
 
-        if run_stage(stage, out, stages, references, force=stage in force_stages, log=log):
+        built_q = built_reference_q(out).get(str(strategy))
+        if stage in stages and built_q is not None and built_q != q:
+            log(f"{stage}: built with Q = {built_q}, walking again for Q = {q}")
+        force = stage in force_stages or (built_q is not None and built_q != q)
+        if run_stage(stage, out, stages, references, force=force, log=log):
             model = model or load_model(out)
             checkpoint()
     manifest = read_manifest(out)

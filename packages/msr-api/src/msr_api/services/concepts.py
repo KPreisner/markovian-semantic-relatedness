@@ -19,6 +19,7 @@ from pydantic import ValidationError
 from msr.concept.build import ConceptParams
 from msr.concept.storage import concept_key
 from msr.jobs.tasks import CONCEPT_TASK
+from msr.model.references import DEFAULT_Q
 from msr_api.core.config import ApiSettings
 from msr_api.core.errors import NotFoundError, ServiceUnavailableError, UnprocessableError
 from msr_api.schemas.concepts import (
@@ -48,7 +49,7 @@ _ATTEMPTS = 3
 
 def resolve_params(model: ModelRow, request: ConceptRequest) -> ConceptParams:
     """The full parameter set: the request's overrides, then the defaults, with `steps` defaulting
-    to the λ of the model's X′ for the chosen reference strategy."""
+    to the λ of the model's X′ for the chosen reference strategy, and `q` its Q."""
     overrides = request.model_dump(exclude={"root"}, exclude_none=True)
     try:
         provisional = ConceptParams.model_validate(overrides)
@@ -72,7 +73,8 @@ def resolve_params(model: ModelRow, request: ConceptRequest) -> ConceptParams:
             code="steps_not_built",
             details={"steps": built[refs]},
         )
-    return ConceptParams.model_validate({**overrides, "steps": built[refs]})
+    q = model.manifest.get("reference_q", {}).get(refs, DEFAULT_Q)
+    return ConceptParams.model_validate({**overrides, "steps": built[refs], "q": q})
 
 
 async def resolve_root(conn: AsyncConnection[Any], model_id: str, term: str) -> VocabRow:

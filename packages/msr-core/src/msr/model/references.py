@@ -20,8 +20,9 @@ from msr.walk.hitting import hitting_times
 
 type Nodes = NDArray[np.intp]
 
-# Q + 1: one more than the Q a concept uses, so the root's column (or the last) can be dropped.
-DEFAULT_COUNT = 51
+# Q, the reference columns a concept uses. A model walks Q + 1 references, so the root's column
+# (or the last) can be dropped.
+DEFAULT_Q = 50
 
 
 @dataclass(frozen=True)
@@ -157,6 +158,8 @@ class References:
     nodes: Nodes
     xprime: NDArray[np.float64]
     steps: int
+    q: int = DEFAULT_Q
+    """Q: the model walked Q + 1 references (fewer if the component is smaller)."""
 
 
 def component_nodes(model: Model, label: int) -> Nodes:
@@ -167,13 +170,13 @@ def compute_references(
     model: Model,
     strategy: Strategy,
     *,
-    count: int = DEFAULT_COUNT,
+    q: int = DEFAULT_Q,
     steps: int = 1000,
     backend: WalkBackend | None = None,
     progress: Progress | None = None,
 ) -> References:
     """Select references in the largest component and walk them, batched, to get X′."""
     component = component_nodes(model, largest_component(model.labels))
-    nodes = select_references(model, component, count, strategy)
+    nodes = select_references(model, component, q + 1, strategy)
     xprime = hitting_times(model, nodes.tolist(), steps=steps, backend=backend, progress=progress)
-    return References(strategy=strategy, nodes=nodes, xprime=xprime, steps=steps)
+    return References(strategy=strategy, nodes=nodes, xprime=xprime, steps=steps, q=q)

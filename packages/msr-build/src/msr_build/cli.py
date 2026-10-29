@@ -22,9 +22,9 @@ from typing import Any
 
 import msr
 from msr.concept.build import ConceptParams
-from msr.model.artifacts import load_model, reference_steps
+from msr.model.artifacts import load_model, reference_q, reference_steps
 from msr.model.build import ModelParams
-from msr.model.references import DegreeMean, Strategy, parse_strategy
+from msr.model.references import DEFAULT_Q, DegreeMean, Strategy, parse_strategy
 from msr.model.stopwords import parse_rule
 from msr.search.scanner import distinct_chunks
 from msr_build.paths import DataDir
@@ -66,7 +66,8 @@ def _concept_args(p: argparse.ArgumentParser) -> None:
 
 def _concept_params(args: argparse.Namespace, model_dir: Path) -> ConceptParams:
     steps = args.steps or reference_steps(model_dir, args.refs)
-    return ConceptParams(refs=args.refs, threshold=args.threshold, steps=steps)
+    q = reference_q(model_dir, args.refs)
+    return ConceptParams(refs=args.refs, threshold=args.threshold, steps=steps, q=q)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -104,6 +105,12 @@ def _parser() -> argparse.ArgumentParser:
         help="strategy for X′ (repeatable; default degree-mean)",
     )
     model.add_argument("--steps", type=int, default=1000, help="walk steps λ for X′")
+    model.add_argument(
+        "--q",
+        type=int,
+        default=DEFAULT_Q,
+        help="Q, reference columns per concept (X′ walks Q + 1 references)",
+    )
     model.add_argument("--parts", type=int, help="build from only the first N parsed parts")
     model.add_argument("--no-save-s", action="store_true", help="skip writing S.npz")
     model.add_argument(
@@ -185,6 +192,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 params=ModelParams(stop_words=args.stop_words, truncation=args.truncation),
                 strategies=strategies,
                 steps=args.steps,
+                q=args.q,
                 save_s=not args.no_save_s,
                 per_language=args.stop_words_per_language,
                 max_parts=args.parts,

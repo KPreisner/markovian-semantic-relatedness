@@ -13,7 +13,7 @@ from typing import Any
 import pyarrow.parquet as pq
 from psycopg import Connection
 
-from msr.model.artifacts import VOCAB, built_reference_steps, read_manifest
+from msr.model.artifacts import VOCAB, built_reference_q, built_reference_steps, read_manifest
 from msr.search.corpus import CorpusConfig, corpus_files, split_name
 from msr_db.registry import CorpusRepository, ModelRepository, VocabRepository, VocabTuple
 
@@ -39,8 +39,11 @@ def register_model(conn: Connection[Any], model_dir: Path, *, log: Log = print) 
     vocab_sha256: str = stages["model"]["files"][VOCAB]["sha256"]
     name: str = manifest.build.get("name", model_id)
     # From refs/ itself, so models built before the manifest recorded it register complete.
-    references = built_reference_steps(model_dir)
-    payload = manifest.model_copy(update={"reference_steps": references}).model_dump(mode="json")
+    references = {
+        "reference_steps": built_reference_steps(model_dir),
+        "reference_q": built_reference_q(model_dir),
+    }
+    payload = manifest.model_copy(update=references).model_dump(mode="json")
     models, vocab = ModelRepository(conn), VocabRepository(conn)
     with conn.transaction():
         existing = models.get(model_id, for_update=True)

@@ -132,3 +132,8 @@ def test_root_alone_in_a_tiny_component_has_no_scalable_weight(
 def test_steps_must_match_xprime(model: Model, references: References) -> None:
     with pytest.raises(ValueError, match="λ"):
         build_concept(model, 3, references, ConceptParams(steps=10))
+
+
+def test_q_must_match_xprime(model: Model, references: References) -> None:
+    with pytest.raises(ValueError, match="Q = 50"):
+        build_concept(model, 3, references, ConceptParams(steps=references.steps, q=150))
