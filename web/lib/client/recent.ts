@@ -53,10 +53,6 @@ export function forgetConcepts(
   );
 }
 
-export function clearRecent(storage: Storage | undefined = safeStorage()): RecentConcept[] {
-  return write([], storage);
-}
-
 function write(list: RecentConcept[], storage: Storage | undefined): RecentConcept[] {
   try {
     storage?.setItem(KEY, JSON.stringify(list));

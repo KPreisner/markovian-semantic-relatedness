@@ -22,10 +22,13 @@ export default function BuildConceptPage() {
             Build a <em className="text-gradient pr-1">concept</em>
           </>
         }
-        lead="A concept is a query expansion with intuitive weights: the terms a random walk from your chosen term reaches much sooner than usual, each weighted against the chosen term's 100. Pick a model and a term. A concept built before opens at once; a new one is walked by a worker while you watch."
+        lead="A concept is the weighted set of terms that a random walk from your chosen term reaches much sooner than usual. Pick a model and a term to build one."
       >
         <div className="mt-2">
-          <Button asChild variant="outline">
+          <Button
+            asChild
+            className="bg-gradient text-primary-foreground shadow-[0_0_32px_var(--glow)]"
+          >
             <Link href="/concepts">All concepts →</Link>
           </Button>
         </div>
