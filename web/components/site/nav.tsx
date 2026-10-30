@@ -3,13 +3,35 @@ import Link from "next/link";
 import { Logo } from "@/components/site/logo";
 
 const LINKS = [
-  { href: "/concepts/new", label: "Concepts" },
-  { href: "/search", label: "Search" },
+  { href: "/concepts", label: "Concepts" },
+  { href: "/searches", label: "Searches" },
   { href: "/stack", label: "Stack" },
   { href: "/health", label: "Health" },
 ];
 
 export function SiteNav() {
+  return (
+    <>
+      <PortfolioBar />
+      <Header />
+    </>
+  );
+}
+
+/** A thin strip above the nav, back to the author's portfolio; it scrolls away with the page. */
+function PortfolioBar() {
+  return (
+    <div className="border-b bg-muted/40">
+      <div className="mx-auto flex h-8 w-full max-w-6xl items-center px-4 font-mono text-xs text-muted-foreground">
+        <a href="https://karl.preisner.us" className="transition-colors hover:text-foreground">
+          ← Karl Preisner · portfolio
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function Header() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/75 backdrop-blur-md">
       <nav className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:gap-6">
@@ -30,10 +52,17 @@ export function SiteNav() {
           ))}
         </ul>
         <a
-          href="/fastapi/docs"
+          href="/MarkovianSemanticRelatedness_april_25_2022.pdf"
+          target="_blank"
           className="ml-auto hidden rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:block"
         >
-          API docs ↗
+          Paper ↗
+        </a>
+        <a
+          href="/fastapi/docs"
+          className="hidden rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:block"
+        >
+          Explore the API ↗
         </a>
       </nav>
     </header>

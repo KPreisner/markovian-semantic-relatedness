@@ -6,7 +6,8 @@ export function SiteFooter() {
           Markovian Semantic Relatedness: an implementation of{" "}
           <a
             className="underline underline-offset-4 hover:text-foreground"
-            href="https://github.com/KPreisner/markovian-semantic-relatedness/tree/main/docs/paper"
+            href="/MarkovianSemanticRelatedness_april_25_2022.pdf"
+            target="_blank"
           >
             the paper
           </a>

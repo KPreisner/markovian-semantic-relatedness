@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { ExampleFigure } from "@/components/explain/concept-example";
 import { SearchIndexView } from "@/components/search/search-index";
+import { KeyPoints } from "@/components/site/key-points";
 import { PageHeader } from "@/components/site/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +18,25 @@ import { load } from "@/lib/server/data";
 
 export const metadata: Metadata = { title: "Searches" };
 
+const POINTS = [
+  {
+    title: "Semantic",
+    body: "A paragraph can rank high without your word, through the words that mean the same thing.",
+  },
+  {
+    title: "Ranked",
+    body: "Each paragraph scores the total of its matched words' scores. With several concepts, a paragraph has to fit every one to rank high.",
+  },
+  {
+    title: "Any chunk size",
+    body: "Paragraphs here, but a chunk can be a sentence, a page, or a whole document.",
+  },
+  {
+    title: "Raw text",
+    body: "No preprocessing, no index, no embeddings; words are matched straight in the text.",
+  },
+];
+
 export default function SearchesPage({ searchParams }: PageProps<"/searches">) {
   return (
     <>
@@ -23,11 +44,13 @@ export default function SearchesPage({ searchParams }: PageProps<"/searches">) {
         eyebrow="Search"
         title={
           <>
-            Every <em className="text-gradient pr-1">search</em>
+            Search by <em className="text-gradient pr-1">meaning</em>
           </>
         }
-        lead="Each search run on this stack, with its concepts, corpus, and settings, and each one still running or failed. Open one to read its results again, or to see why it failed."
+        lead="A search scores every paragraph of raw news text (CC-NEWS) with one or more concepts and puts the best matches first."
+        aside={<ExampleFigure />}
       >
+        <KeyPoints points={POINTS} />
         <div className="mt-2">
           <Button
             asChild
@@ -38,6 +61,10 @@ export default function SearchesPage({ searchParams }: PageProps<"/searches">) {
         </div>
       </PageHeader>
       <div className="mx-auto w-full max-w-6xl px-4 py-10">
+        <p className="mb-6 text-sm text-muted-foreground">
+          Every search run on this site. Open one to read its ranked paragraphs, with matches
+          highlighted by concept.
+        </p>
         <Suspense fallback={<IndexSkeleton />}>
           <IndexContent searchParams={searchParams} />
         </Suspense>

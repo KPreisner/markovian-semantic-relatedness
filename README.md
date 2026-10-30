@@ -105,13 +105,13 @@ web is the Next.js app (`web/`), the UI at <http://127.0.0.1:3000>:
 
 | Page | What it does |
 |---|---|
-| `/` | what MSR is, with the paper's toy graph and the stack's models, corpora, and workers |
-| `/concepts` | every concept built, plus those still building or failed, filterable by status, model, and term; building ones update live |
-| `/concepts/new` | pick a model, autocomplete a chosen term, set advanced concept parameters, build; with what a concept is and how its weights rank a search |
+| `/` | what MSR is and how to use it (model, concept, discovery, search), with the paper's toy graph, a worked example of how a search ranks text, and the stack's models, corpora, and workers |
+| `/concepts` | what a concept is, with the toy graph; then every concept built, plus those still building or failed, filterable by status, model, and term; building ones update live |
+| `/concepts/new` | pick a model, autocomplete a chosen term, set advanced concept parameters, build; with what a concept is, how its weights rank a search, and the toy graph |
 | `/jobs/{id}` | a concept job's live progress; opens the concept when it's done |
 | `/concepts/{id}` | the ranked concept table, with weights, co-occurrence, counts, and how it was built |
-| `/search` | one or more concepts of a model (building any that are missing), a corpus, and whole-word or inside-word matching |
-| `/searches` | every search run, plus those still running or failed, filterable by status, model, corpus, and term; running ones update live |
+| `/search` | one or more concepts of a model (building any that are missing), a corpus, and whole-word or inside-word matching; with a worked example of how a search ranks text |
+| `/searches` | how a search ranks text, with a worked example; then every search run, plus those still running or failed, filterable by status, model, corpus, and term; running ones update live |
 | `/searches/{id}` | the scan's live progress, then ranked paragraphs with matches colored by concept |
 | `/health` | the stack's health, refreshed every 5 s |
 
