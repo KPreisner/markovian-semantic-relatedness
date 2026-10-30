@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { WalkGraph } from "@/components/explain/walk-graph";
 import { PageHeader } from "@/components/site/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +39,7 @@ export default function BuildConceptPage() {
           <WorkbenchLoader />
         </Suspense>
         <ConceptExplainer />
+        <WalkGraph className="mx-auto mt-10 max-w-2xl rounded-3xl border bg-card/60 p-4 shadow-[0_0_60px_var(--glow)]" />
       </div>
     </>
   );

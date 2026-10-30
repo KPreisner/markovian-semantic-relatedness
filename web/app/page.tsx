@@ -1,29 +1,39 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { WalkGraph } from "@/components/home/walk-graph";
+import { ConceptExample } from "@/components/explain/concept-example";
+import { WalkGraph } from "@/components/explain/walk-graph";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { zHealthResponse, zListCorporaResponse, zListModelsResponse } from "@/lib/api/zod.gen";
 import { formatCount } from "@/lib/format";
 import { load } from "@/lib/server/data";
 
+// The four things to do with MSR, in order; each card links to where you do it.
 const STEPS = [
   {
-    title: "Count co-occurrence",
-    body: "The source text is split into chunks (here, Wikipedia paragraphs), and each chunk becomes a set of terms. Terms that appear in the same chunk are linked, and the counts make a graph over the whole vocabulary.",
+    title: "Create a model",
+    body: "Give it text split into chunks (here, Simple English Wikipedia paragraphs). Terms that share a chunk are linked, and the counts make a co-occurrence graph over the whole vocabulary. Models are built offline with the msr CLI; this demo's is ready to use.",
+    action: {
+      href: "/MarkovianSemanticRelatedness_april_25_2022.pdf#page=3",
+      label: "How to build one ↗",
+      newTab: true,
+    },
   },
   {
-    title: "Walk from the chosen term",
-    body: "A random walk spreads out from the chosen term, step by step. How soon it reaches each term measures how close that term is to the chosen one.",
+    title: "Create a concept",
+    body: "Pick a term. A random walk spreads out from it, and the terms it reaches much sooner than they're usually reached from everywhere else form its concept: weighted terms, with the chosen term at 100.",
+    action: { href: "/concepts/new", label: "Build a concept →" },
   },
   {
-    title: "Measure against comparison terms",
-    body: "The model also walks from about 50 comparison terms spread across the graph, which tells it how far each term usually is from everything. Terms much closer to the chosen term than they usually are to other terms form its concept.",
+    title: "Discover",
+    body: "A concept answers “what is related to this term?” in the text the model was built from. It can turn up the needle in the haystack: a rare term tied closely to yours that a keyword search would never think to ask for.",
+    action: { href: "/concepts", label: "Browse concepts →" },
   },
   {
-    title: "Semantically search raw text",
-    body: "The concept's weighted terms are matched directly in raw, untokenized text, chunk by chunk. Several concepts combine by geometric mean, so a chunk ranks high only if it's relevant to every concept.",
+    title: "Search, ranked by meaning",
+    body: "The concept's weights rank chunks of any raw text: no tokenizing, no index, no embeddings, no training on the text being searched. Several concepts combine by geometric mean, so a chunk ranks high only if it fits every one.",
+    action: { href: "/search", label: "Search with concepts →" },
   },
 ];
 
@@ -43,28 +53,25 @@ export default function Home() {
             <h1 className="text-5xl leading-[1.02] md:text-7xl">
               Meaning, found by <em className="text-gradient pr-1">wandering</em>.
             </h1>
-            <p className="max-w-xl text-lg text-muted-foreground">
-              Give it a word. A random walk across a co-occurrence graph finds the terms that sit
-              closer to it than they usually are to anything else: its concept, a query expansion
-              with intuitive weights. Then it runs a ranked semantic search of any raw text with
-              that concept, scoring chunks of whatever size you choose (here, paragraphs). No
-              embeddings, no tokenizing, no index, no training on the text being searched.
-            </p>
+            <div className="flex max-w-xl flex-col gap-3">
+              <p className="text-xl font-semibold md:text-2xl">
+                Give it a word. Find its hidden meaning.
+              </p>
+              <p className="text-lg text-muted-foreground">
+                Unsupervised Markov random walks uncover related words, even ones that never appear
+                beside it, each scored by how closely it belongs.
+              </p>
+              <p className="text-lg text-muted-foreground">
+                Search any raw text by <em>meaning</em>, not keywords, ranked by those scores.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-3">
               <Button
                 asChild
                 size="lg"
                 className="bg-gradient h-12 px-7 text-base text-primary-foreground shadow-[0_0_40px_var(--glow)] transition-transform hover:scale-[1.03]"
               >
-                <Link href="/concepts/new">Build a concept →</Link>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="h-12 px-7 text-base backdrop-blur"
-              >
-                <a href="/fastapi/docs">Explore the API</a>
+                <Link href="/concepts">Explore concepts →</Link>
               </Button>
             </div>
           </div>
@@ -73,21 +80,36 @@ export default function Home() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-4 py-16">
-        <h2 className="mb-8 text-4xl">How it works</h2>
-        <ol className="grid gap-4 md:grid-cols-4">
+        <h2 className="mb-8 text-4xl">How to use it</h2>
+        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, i) => (
             <li
               key={step.title}
-              className="relative rounded-2xl border bg-card p-5 transition-colors hover:border-primary/40"
+              className="flex flex-col rounded-2xl border bg-card p-5 transition-colors hover:border-primary/40"
             >
               <span className="text-gradient font-heading text-5xl leading-none">0{i + 1}</span>
               <h3 className="mt-2 font-sans text-base font-semibold tracking-normal">
                 {step.title}
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
+              <div className="mt-auto pt-4">
+                <Button asChild variant="outline" className="w-full">
+                  {step.action.newTab ? (
+                    <a href={step.action.href} target="_blank">
+                      {step.action.label}
+                    </a>
+                  ) : (
+                    <Link href={step.action.href}>{step.action.label}</Link>
+                  )}
+                </Button>
+              </div>
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-4 pb-16">
+        <ConceptExample />
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-4 pb-20">

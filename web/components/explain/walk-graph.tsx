@@ -161,12 +161,20 @@ export function WalkGraph({ className }: { className?: string }) {
         })}
       </svg>
       <figcaption className="mt-3 text-center text-sm text-muted-foreground">
-        The paper&apos;s toy corpus. Walks from{" "}
+        Creating a concept for <span className="font-mono text-foreground">cat</span>. Walks from{" "}
         <span className="font-mono text-foreground">cat</span> reach{" "}
         <span className="font-mono text-foreground">fat</span>,{" "}
         <span className="font-mono text-foreground">in</span>, and{" "}
-        <span className="font-mono text-foreground">hat</span> sooner than walks from elsewhere in
-        the graph do: they&apos;re cat&apos;s concept.
+        <span className="font-mono text-foreground">hat</span> sooner than walks originating from
+        elsewhere in the graph. From the{" "}
+        <a
+          href="/MarkovianSemanticRelatedness_april_25_2022.pdf"
+          target="_blank"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          paper
+        </a>
+        &apos;s toy corpus.
       </figcaption>
     </figure>
   );

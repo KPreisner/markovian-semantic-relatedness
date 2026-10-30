@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { ConceptExample } from "@/components/search/concept-example";
+import { ConceptExample } from "@/components/explain/concept-example";
 import { type Chip, SearchBuilder } from "@/components/search/search-builder";
 import { PageHeader } from "@/components/site/page-header";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,9 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
         <Suspense fallback={<Skeleton className="h-96 rounded-3xl" />}>
           <SearchLoader searchParams={searchParams} />
         </Suspense>
-        <ConceptExample />
+        <div className="mt-16">
+          <ConceptExample />
+        </div>
       </div>
     </>
   );
